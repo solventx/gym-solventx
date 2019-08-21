@@ -10,41 +10,40 @@ Self-assembling chemical process simulator
 ## Installation
 You can install the module directly from github with following commands:
 ```
-git clone https://github.com/solventx/gym-solventx
+git clone https://github.com/solventx/gym-solventx.git
 cd gym-solventx
 pip install -e .
 ```
 
-## Dependencies  
-You will need graphviz installed and added to your PATH variable.
-[Install Graphviz](https://graphviz.gitlab.io/download/)  
-Add Graphviz dot executable and its directory to your system's PATH variable
+### Dependencies  
+#### Graphviz
+[Graphviz](https://graphviz.gitlab.io/download/). Please add Graphviz dot executable and its directory to your system's PATH variable
 
-For Example: `C:\Program Files (x86)\Graphviz2.38\bin` and 
-`C:\Program Files (x86)\Graphviz2.38\bin\dot.exe` for Windows.
+Example (for Windows): 
+`C:\Program Files (x86)\Graphviz2.38\bin` and 
+`C:\Program Files (x86)\Graphviz2.38\bin\dot.exe`
 
-Cantera is required to run the provided solvent extraction code.  
-**Add cantera to an existing conda environment**  
-`activate your_env_name`  
-`conda install -c cantera cantera`  
+#### Cantera
+Cantera is not available with pip and need to be installed within a Conda environment. You can either install in an existing environment or within a freshly created environment. Detailed instructions can be found [here.](https://cantera.org/install/conda-install.html)
 
-Additionally, located in gym_solventx/envs/methods/dependencies/ is a file called 'elementz.xml'.  
-if you wish to use the solvent extraction code provided, this must be added to your cantera sys directory.  
-For Example: `C:\Users\username\AppData\Local\Continuum\anaconda3\envs\tf\Lib\site-packages\cantera\data`
+Additionally, add the file **elementz.xml** located in **gym_solventx/envs/methods/dependencies/** to the Cantera sys directory. 
 
-Modules: SciPy, Numpy, Matlplotlib, Gym, Pandas, Seaborn, Graphviz
+Example (for Windows): `C:\Users\username\AppData\Local\Continuum\anaconda3\envs\myenv\Lib\site-packages\cantera\data`
+
+#### Other Python Modules
+SciPy, Numpy, Matlplotlib, Gym, Pandas, Seaborn
 
 ## Using the module
-The module can be imported as a normal python module: import gym_solventx
+The module can be imported as a normal python module: 
 
-Check out a demonstration with Jupyter Notebooks: [Here](https://github.com/solventx/gym-solventx/blob/master/demo.ipynb)
+```python
+import pvder
+```
 
-If you need to add your Ipython Kernal from an existing conda environment:  
-`conda activate my_env`  
-`python -m ipykernal install --user` #Adds kernal to Jupyter Notebook/Lab in existing conda environment
+Try out the Jupyter notebooks with a demo [here.](https://github.com/solventx/gym-solventx/blob/master/demo.ipynb)
 
 ## Unit Test
-To run the provided unit test located in `gym_solventx/test/test.py` you must use an Anaconda environemnt since cantera is not available with pip.  
+To run the provided unit test located in `gym_solventx/test/test.py` you must use an Anaconda environment since cantera is not available with pip.
 
 The test can be run through the terminal using `pytest test.py` 
 
@@ -59,7 +58,7 @@ You will also need to initialize conda in your respective terminal:
 `conda init cmd.exe` for example in windows
 
 ## Issues
-Please feel free to raise an issue when bugs are encountered or if you are need further documentation.
+Please feel free to raise an issue for bugs or feature requests.
 
 ## Who is responsible?
 Core developer:  
@@ -88,4 +87,4 @@ If you use this code please cite it as:
 ## Copyright and License  
 Copyright © 2019, UChicago Argonne, LLC
 
-Process Design Environment Simulator for Reinforcement Learning (SolventX) is distributed under the terms of BSD-3 OSS License.
+Process Design Environment Simulator for Reinforcement Learning (SolventX) is distributed under the terms of [BSD-3 OSS License.](LICENSE.md)

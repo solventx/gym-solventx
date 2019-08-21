@@ -37,7 +37,7 @@ Modules: SciPy, Numpy, Matlplotlib, Gym, Pandas, Seaborn, Graphviz
 ## Using the module
 The module can be imported as a normal python module: import gym_solventx
 
-Check out a demonstration with Jupyter Notebooks: [Here](https://github.com/solventx/gym-solventx/demo.ipynb)
+Check out a demonstration with Jupyter Notebooks: [Here](https://github.com/solventx/gym-solventx/blob/master/demo.ipynb)
 
 If you need to add your Ipython Kernal from an existing conda environment:  
 `conda activate my_env`  
@@ -74,6 +74,7 @@ Contributor:
 ## Citation
 If you use this code please cite it as:
 
+```
 @misc{pvder,
   title = {{gym-solventx}: Gym Environment containing a solvent extraction process simulator.},
   author = "{Blake Richey, Nwike Iloeje, Siby Jose Plathottam}",
@@ -82,6 +83,7 @@ If you use this code please cite it as:
   year = 2019,
   note = "[Online; accessed 21-August-2019]"
 }
+```
 
 ## Copyright and License  
 Copyright © 2019, UChicago Argonne, LLC

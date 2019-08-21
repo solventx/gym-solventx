@@ -75,7 +75,7 @@ Contributor:
 If you use this code please cite it as:
 
 ```
-@misc{pvder,
+@misc{gym-solventx,
   title = {{gym-solventx}: Gym Environment containing a solvent extraction process simulator.},
   author = "{Blake Richey, Nwike Iloeje, Siby Jose Plathottam}",
   howpublished = {\url{https://github.com/solventx/gym-solventx}},

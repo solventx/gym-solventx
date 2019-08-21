@@ -104,3 +104,13 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# log files
+output.txt
+gym_solventx/envs/methods/figures/*
+gym_solventx/envs/methods/output/*
+logs/*
+
+
+#IDE
+.vscode

@@ -5,24 +5,33 @@ Created on Mon May 20 14:05:32 2019
 @author: ciloeje
 """
 
-import pandas as pd
+import os, sys
+
+import numpy   as np
+import pandas  as pd
 import cantera as ct
-import numpy as np
 
 from scipy.optimize import root
 
+def get_simulator_path():
+    gym_solventx_directory = ''
+    for directory in sys.path:
+        if 'self-assembling-process-simulator' in directory:
+            gym_solventx_directory = directory + '/gym_solventx/'
+    
+    return gym_solventx_directory
     
 class solvent_extraction:
     
-    xml                     = 'xml/PC88A_HCL_NdPr.xml'
+    #dynamically obtain path to environment dependencies
+    dirlocation = get_simulator_path()
+    
+    xml                     = dirlocation + 'envs/methods/xml/PC88A_HCL_NdPr.xml'
+    datacsv                 = dirlocation + 'envs/methods/input/data.csv'
+    bndcsv                  = dirlocation + 'envs/methods/input/bounds.csv'
     module_id               = 2
     strip_group             = 4
-#    xml                     = 'xml/PC88A_HCL_NdPrCeLa.xml'
-#    module_id               = 1
-#    strip_group             = 2
 
-    datacsv                 = 'input/data.csv'
-    bndcsv                  = 'input/bounds.csv'
     
     var_names               = ['(HA)2(org)',	'H+ Extraction', 'H+ Scrub',	'H+ Strip',	'OA Extraction',	'OA Scrub',	'OA Strip', 'Recycle','Extraction','Scrub', 'Strip']
     dimension              = len(var_names)
@@ -126,7 +135,7 @@ class solvent_extraction:
         rhoslv              = self.rhoslv       
         nre                 = np.zeros(len(self.ree)) # REE specie moles
         salts               = np.zeros(len(self.ree)) # neutral complexe moles
-#        x                   = self.variables
+
 #        Flows
         orgvol              = feedvol * x[varnames.index('OA Extraction')]
         aqvols              = [feedvol,orgvol/x[varnames.index('OA Scrub')], orgvol/x[varnames.index('OA Strip')] ]
@@ -202,7 +211,6 @@ class solvent_extraction:
             
             if Ns[col] > self.Ns[col]: # add stages
                 n = Ns[col] - self.Ns[col]
-                print(self.column_names[col],'stages higher by', n)
                 stage = [i for i in yi[-ns:] ]
                 ybucket.append(yi + n*stage)
                 Nybucket.append(len(yi +n*stage))
@@ -210,23 +218,16 @@ class solvent_extraction:
 
                 
             elif Ns[col] < self.Ns[col]:
-#                print ('stages lower')
                 n = self.Ns[col] - Ns[col]
-                print(self.column_names[col],'stages lower by', n)
                 lim = int(n * ns)
-#                print ('lim',lim)
                 ybucket.append(yi[:-lim])
                 Nybucket.append(len(yi[:-lim]))
-#                print ('nyboss, col', Nyboss, col )
                 icount = Nyi[col]  
                 
             else:
-                print(self.column_names[col],'stages same')
                 ybucket.append(yi)
                 Nybucket.append(len(yi)) #
-#                print ('nyboss, col', Nyboss, col )
                 icount = Nyi[col]  
-        print()
             
         self.y = np.array([i for j in ybucket for i in j])
         self.Ny = [sum(Nybucket[:i+1]) for i in range(len(Nybucket))] # 
@@ -312,38 +313,38 @@ class solvent_extraction:
         
 
 
+    def errorcheck(self, x): # call this function 
+        
+
+        status             = ecolumncheck (self.y, self.n_species, self.Ns, self.Ny,
+                                                           self.column_names, self.xml, self.phase_names,
+                                                           self.Hp_Index, self.Cl_Index, self.HA_Index, x[self.varnames.index('Recycle')])
+                            
+        return status      
+
+
         
     def evaluate(self, x):
         
-#        resy                = root(ecolumn, self.y.copy(), args=(self.n_species, self.Ns, self.Ny,
-#                                                           self.column_names, self.xml, self.phase_names,
-#                                                           self.Hp_Index, self.Cl_Index, self.HA_Index, x[self.varnames.index('Recycle')]), method='df-sane', options=None) #options={'disp':True, 'maxfev':15} 
-
         resy                = root(ecolumn, self.y.copy(), args=(self.n_species, self.Ns, self.Ny,
                                                            self.column_names, self.xml, self.phase_names,
                                                            self.Hp_Index, self.Cl_Index, self.HA_Index, x[self.varnames.index('Recycle')]), method='hybr', options=None) #options={'disp':True, 'maxfev':15} 
 
         self.y              = resy.x.copy()
-############################# estimate recovery##############################################       
-
-        self.recovery(x)    
+        self.status         = resy.success # bool, True or False, checks if root finding function was successful
+        self.stage_status   = self.errorcheck(x) # returns list that shows final status of each 'stage' solution as True or False     
+        self.recovery(x)      
         
-
-
-#    def update_variable ('[var names]', values )           
-        
-        
+#equilibrates each stage of a column and calculates error from a guess to the actual. yI is guess
 def ecolumn (yI, nsp, Ns, Ny, header,xml, phase_names, Hp_Index, Cl_Index, HA_Index, recycle) : # note the change. xis ore multiplicative fractions now
     
     y                       = yI.copy()
-
-#    print ('Insider : Ns', Ns, '  Ny ', Ny, '  leny ',len(y))
 
     ct_handle               = ct.import_phases(xml,phase_names)   
     mx                      = ct.Mixture(ct_handle)
     aq                      = mx.phase_index(phase_names[0])
     org                     = mx.phase_index(phase_names[1])
-    naq                     = mx.phase(aq).n_species
+    naq                     = mx.phase(aq).n_species # number of aqueous species
     norg                    = mx.phase(org).n_species
     ns                      = mx.n_species 
  
@@ -367,8 +368,6 @@ def ecolumn (yI, nsp, Ns, Ny, header,xml, phase_names, Hp_Index, Cl_Index, HA_In
         y[icount+Cl_I]          =  y[icount+Hp_I] + 3*sum(y[icount + Cl_I+1: icount + HA_I]) # ensure mass balance for chloride
             
         icount                  = Ny[j] # step to next column 
-
-#    print (Ny[-1], len(y))
         
 ########################################## aqueous feed driven solution ##############################
                     
@@ -389,12 +388,9 @@ def ecolumn (yI, nsp, Ns, Ny, header,xml, phase_names, Hp_Index, Cl_Index, HA_In
                 
                 y[(i+1)*ns+count:(i+1)*ns+count+naq] = mx.species_moles[:naq] #mx.species_moles[:naq]  # update aq variable vector corresponding to stage i, column m exit stream
                 y[(i)*ns+naq+count:(i+1)*ns + count] = mx.species_moles[naq:] #mx.species_moles[naq:]  # update org variable vector corresponding to stage i, column m exit stream
-#                if (i+2)*ns+count >= len(y):
-#                    print (i, ns, count)
                 
 
             except:
-                print ('Some people got real gibbs problems in column'+str(i)+' : ', [round(k,3) for k in mx.species_moles])
                 pass
 
 #         Update the corresponding org tear stream
@@ -406,5 +402,76 @@ def ecolumn (yI, nsp, Ns, Ny, header,xml, phase_names, Hp_Index, Cl_Index, HA_In
         count                   = Ny[mk] # count + Nx[m] 
 
 
-#    fun=yI-y
     return yI-y
+
+ 
+def ecolumncheck (yI, nsp, Ns, Ny, header,xml, phase_names, Hp_Index, Cl_Index, HA_Index, recycle) : # note the change. xis ore multiplicative fractions now
+    
+    y                       = yI.copy()
+
+    ct_handle               = ct.import_phases(xml,phase_names)   
+    mx                      = ct.Mixture(ct_handle)
+    aq                      = mx.phase_index(phase_names[0])
+    org                     = mx.phase_index(phase_names[1])
+    naq                     = mx.phase(aq).n_species
+    norg                    = mx.phase(org).n_species
+    ns                      = mx.n_species 
+ 
+    stream                  = np.zeros(ns) 
+    Hp_I                    = Hp_Index
+    Cl_I                    = Cl_Index
+    HA_I                    = HA_Index
+    
+    
+    y[Ny[0]-norg:Ny[0]]     =   nsp['Extraction'][naq:] # organic feed                
+        
+#    ################# update aqueous feeds ###################################        
+
+    icount                  = 0
+               
+    for j in range(len(Ny)): 
+
+        y[icount:icount+naq]    = nsp[header[j]][:naq]  # Feed stays constant
+            
+        y[icount+Cl_I]          =  y[icount+Hp_I] + 3*sum(y[icount + Cl_I+1: icount + HA_I]) # ensure mass balance for chloride
+            
+        icount                  = Ny[j] # step to next column 
+
+        
+########################################## aqueous feed driven solution ##############################
+                    
+
+    count = 0 # adjust reference to column inlet stream  
+    stagestatus = [True for i in range(sum(Ns))]
+    cfs = 0 # feed stage index for current column - 0 for extraction, 0+Ns[0] for scrub, etc.
+    for mk in range(len(Ns)) : # Ns = column stages in recovery plant        
+        N = Ns[mk] # number of stages in column m  
+        
+        for i in range(N): # for each stage in column m   
+            
+            stream[:naq]        = y[(i*ns)+count:(i*ns)+count+naq] # aqueous feed in stage i, column m
+            stream[naq:]        = y[(i+1)*ns+count+naq:((i+2)*ns)+count] # organic feed in stage i, column m
+            mx.species_moles    = stream 
+
+            try:
+                mx.equilibrate('TP',log_level=0) # default          
+                
+                y[(i+1)*ns+count:(i+1)*ns+count+naq] = mx.species_moles[:naq] #mx.species_moles[:naq]  # update aq variable vector corresponding to stage i, column m exit stream
+                y[(i)*ns+naq+count:(i+1)*ns + count] = mx.species_moles[naq:] #mx.species_moles[naq:]  # update org variable vector corresponding to stage i, column m exit stream
+                
+
+            except:
+                stagestatus[cfs+i] = False
+                pass
+
+#         Update the corresponding org tear stream
+        cfs = Ns[mk] # update error check count 
+        
+        if mk < len(Ny)-1:
+            
+            y[Ny[mk+1]-norg:Ny[mk+1] ]   = y[count+naq:count+ns ] 
+ 
+        count                   = Ny[mk] # count + Nx[m] 
+
+
+    return stagestatus #yI-y

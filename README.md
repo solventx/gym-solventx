@@ -37,7 +37,7 @@ SciPy, Numpy, Matlplotlib, Gym, Pandas, Seaborn
 The module can be imported as a normal python module: 
 
 ```python
-import pvder
+import gym_solventx
 ```
 
 Try out the Jupyter notebooks with a demo [here.](https://github.com/solventx/gym-solventx/blob/master/demo.ipynb)

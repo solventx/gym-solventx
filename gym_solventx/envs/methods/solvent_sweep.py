@@ -16,9 +16,9 @@ from scipy.optimize import root
 def get_simulator_path():
     gym_solventx_directory = ''
     for directory in sys.path:
-        if 'self-assembling-process-simulator' in directory:
-            gym_solventx_directory = directory + '/gym_solventx/'
-    
+        if 'gym-solventx' in directory:
+            ind = directory.index('gym-solventx')
+            gym_solventx_directory = directory[:ind+12] + '/gym_solventx/'
     return gym_solventx_directory
     
 class solvent_extraction:

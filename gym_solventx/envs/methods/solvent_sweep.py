@@ -84,9 +84,10 @@ class solvent_extraction:
         self.variables      = self.df[varnames].values[0]
         
         # Feed concentrations
-        self.feed           = self.df[self.ree] # Nd, Pr concentrations, g/L
+        self.feed           = self.df[self.ree].values[0] # Nd, Pr concentrations, g/L
         self.feed_total     = sum([ik for ik in self.feed])
-        self.fbounds        = [5.5, 8.5] # g/l
+        self.fracbnds       = [0.55, 0.85] # 
+        self.fbounds        = [ik*self.feed_total for ik in self.fracbnds] # g/l
         
         self.get_mw() # molecular weights for rare earth elements and solvents
 

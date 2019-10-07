@@ -201,8 +201,8 @@ class SolventXEnv(gym.Env):
     for i, var in enumerate(self.observation_variables):
       self.envstate[var] = self.obj.variables[i]
 
-    self.feed[0] = random.uniform(self.fbounds[0],self.fbounds[1]) #Randomize Nd concentration within bounds
-    self.feed[1] = self.feed_total - self.feed[0]  #Randomize Pr concentartion
+    self.obj.feed[0] = random.uniform(self.obj.fbounds[0],self.obj.fbounds[1]) #Randomize Nd concentration within bounds
+    self.obj.feed[1] = self.obj.feed_total - self.obj.feed[0]  #Randomize Pr concentartion
         
     variables = self.obj.variables
     self.obj.update_flows(variables)

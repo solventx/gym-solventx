@@ -83,6 +83,11 @@ class solvent_extraction:
         self.varnames       = varnames #+ [i for i in ree]
         self.variables      = self.df[varnames].values[0]
         
+        # Feed concentrations
+        self.feed           = self.df[self.ree] # Nd, Pr concentrations, g/L
+        self.feed_total     = sum([ik for ik in self.feed])
+        self.fbounds        = [0.55, 0.85]
+        
         self.get_mw() # molecular weights for rare earth elements and solvents
 
         self.feedvol        = feedvol * scale
@@ -154,11 +159,13 @@ class solvent_extraction:
             
             if k==0:
                 for re in self.ree:                     
-                    nre[self.ree.index(re)] = aqvols[k] *self.df[re]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
+#                    nre[self.ree.index(re)] = aqvols[k] *self.df[re]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
+                    nre[self.ree.index(re)] = aqvols[k] *self.feed[self.ree.index(re)]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
 
             elif k==1:
                 for re in self.ree:                     
-                    nre[self.ree.index(re)] = self.is_ree[self.ree.index(re)] *(x[varnames.index('Recycle')])* aqvols[k] *self.df[re]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
+#                    nre[self.ree.index(re)] = self.is_ree[self.ree.index(re)] *(x[varnames.index('Recycle')])* aqvols[k] *self.df[re]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
+                    nre[self.ree.index(re)] = self.is_ree[self.ree.index(re)] *(x[varnames.index('Recycle')])* aqvols[k] *self.feed[self.ree.index(re)]/ mwre[self.ree.index(re)] # [l/s]*[g/l]/[g/mol] = mol
                 
             else:
                 for re in self.ree:

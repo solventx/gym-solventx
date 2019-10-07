@@ -86,7 +86,7 @@ class solvent_extraction:
         # Feed concentrations
         self.feed           = self.df[self.ree] # Nd, Pr concentrations, g/L
         self.feed_total     = sum([ik for ik in self.feed])
-        self.fbounds        = [0.55, 0.85]
+        self.fbounds        = [5.5, 8.5] # g/l
         
         self.get_mw() # molecular weights for rare earth elements and solvents
 

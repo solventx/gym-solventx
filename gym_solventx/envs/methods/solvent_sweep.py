@@ -57,8 +57,8 @@ class solvent_extraction:
         # feed data must be in g/l for components and ml for volumetric flow
         self.bounds       = pd.read_csv(bounds)
 
-        self.lower      = self.bounds[varnames].ix[0].values
-        self.upper      = self.bounds[varnames].ix[1].values
+        self.lower      = self.bounds[varnames].iloc[0].values
+        self.upper      = self.bounds[varnames].iloc[1].values
 
  
         self.xml            = xml  

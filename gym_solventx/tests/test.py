@@ -17,7 +17,7 @@ from gym_solventx.envs import solventx_env
 def test_make():
   env = gym.make('gym_solventx-v0')
   assert env.spec.id == 'gym_solventx-v0'
-  assert isinstance(env.unwrapped, solventx_env.Simulator)
+  assert isinstance(env.unwrapped, solventx_env.SolventXEnv)
 
 #test observation space
 def test_env():

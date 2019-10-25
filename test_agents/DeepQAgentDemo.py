@@ -3,9 +3,9 @@ from os      import path
 import gym_solventx
 from DQAgent import DQAgent
 
-env = gym.make('gym_solventx-v0')
+env = gym.make('gym_solventx-v0', goals_list=['Purity', 'Recovery'])
 
-root_path = './best_results/'
+root_path = './nwike/'
 
 agent_opts = {
                 #hyperparameters
@@ -31,13 +31,13 @@ agent_opts = {
             } 
 
 model_opts = {
-                'num_layers':      4,
-                'default_nodes':   20,
+                'num_layers':      6,
+                'default_nodes':   128,
                 'dropout_rate':    0.1,
                 'model_type':      'ann',
-                'add_dropout':     True,
+                'add_dropout':     False,
                 'add_callbacks':   False,
-                'nodes_per_layer': [128, 64, 64, 32],
+                'nodes_per_layer': [128, 256, 192, 64, 128, 64],
 
                 #cnn options
                 'filter_size':     3,
@@ -66,7 +66,8 @@ def evaluate_model(agent_opts, model_opts, best_model=True):
       agent.load_weights(f'{root_path}sx_pur_rec')
 #    results = agent.evaluate(100, render=False, verbose=False)
 #    print(f'Average Reward: {sum(sum(results,[]))/len(results)}')
-    results = agent.evaluate(1, render=True, verbose=True)
+    results = agent.evaluate(15, render=False, verbose=True)
+    env.get_stats(SHOW_PLOT=True)
 
-train_model(agent_opts, model_opts)
-#evaluate_model(agent_opts, model_opts, best_model=True)
+#train_model(agent_opts, model_opts)
+evaluate_model(agent_opts, model_opts, best_model=True)

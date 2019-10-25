@@ -303,7 +303,7 @@ class DQAgent(Utilities):
                 t = self.format_time(dt.total_seconds())            
                 results = f'Epoch: {epoch}/{n_epochs-1} | ' + \
                   f'Steps {n_steps} | ' + \
-                  f'Cumulative Reward: {sum(rewards)} | ' + \
+                  f'Max Reward: {max(rewards)} | ' + \
                   f'Time: {t}'
                 print(results)
 
@@ -450,7 +450,7 @@ class DQAgent(Utilities):
                     f'Accuracy: %.4f | ' % accuracy +\
                     f'Steps {n_steps} | ' +\
                     f'Epsilon: %.3f | ' % self.epsilon +\
-                    f'Reward: %.3f | ' % sum(rewards) +\
+                    f'Reward: %.3f | ' % max(rewards) +\
                     f'Time: {t}'
                 print(results)
 
@@ -465,47 +465,6 @@ class DQAgent(Utilities):
             if self.action_policy == 'eg':
                 decay = self.explore_spec['EPSILON_DECAY']
                 self.epsilon = max(self.min_epsilon, decay*self.epsilon)
-
-    def is_best(self, loss, rewards):
-        '''
-        Used to define best results. Will most likely need to be changed
-        between each environment as the goal is different for every
-        environment
-        Result: Saves best model to a backup file `self.best_model_file`
-        '''
-
-
-        if not hasattr(self, 'best_model'):
-            self.best_model = {
-                    'weights': self.model.get_weights(),
-                    'loss':    loss,
-                    'accuracy':   .8
-                    }
-            
-        inputs = self.env.validation[0:5000]
-        targets = self.env.validation_answers[0:5000]
-        if hasattr(self, 'target_model'):
-          loss, accuracy = self.target_model.evaluate(inputs, targets, verbose = 0)
-        else:
-          loss, accuracy = self.model.evaluate(inputs, targets, verbose = 0)
-
-        mod_info = None
-        if accuracy > self.best_model['accuracy']:
-            mod_info = {
-                'weights':    self.model.get_weights(),
-                'loss':       loss,
-                'accuracy':   accuracy
-            }
-        elif accuracy == self.best_model['accuracy'] and loss < self.best_model['loss']:
-            mod_info = {
-                'weights': self.model.get_weights(),
-                'loss':    loss,
-            }
-
-        if mod_info:
-            self.best_model.update(mod_info)
-            print('New best model reached: {', self.best_model['loss'], self.best_model['accuracy'], '}')
-            self.model.save_weights(self.best_model_file, overwrite=True)
 
     def is_best(self, loss, rewards):
         '''

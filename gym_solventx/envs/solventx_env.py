@@ -131,7 +131,7 @@ class SolventXEnv(gym.Env):
           self.done   = True
           self.reward = -100
     
-    return self.obj.variables, self.reward, self.done, None
+    return self.obj.variables, self.reward, self.done, {}
 
   def perform_action(self, index, action):
     variables = self.obj.variables

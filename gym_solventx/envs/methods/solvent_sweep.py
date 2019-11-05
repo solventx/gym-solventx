@@ -328,7 +328,7 @@ class solvent_extraction:
         
         resy                = root(ecolumn, self.y.copy(), args=(self.n_species, self.Ns, self.Ny,
                                                            self.column_names, self.xml, self.phase_names,
-                                                           self.Hp_Index, self.Cl_Index, self.HA_Index, x[self.varnames.index('Recycle')]), method='krylov', options=None) #options={'disp':True, 'maxfev':15}, method=’hybr’
+                                                           self.Hp_Index, self.Cl_Index, self.HA_Index, x[self.varnames.index('Recycle')]), method='krylov', options={'maxiter':10}) #options={'disp':True, 'maxfev':15}, method=’hybr’
 
         self.y              = resy.x.copy()
         self.status         = resy.success # bool, True or False, checks if root finding function was successful

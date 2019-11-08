@@ -1,6 +1,8 @@
 import gym, random, math, sys
 import numpy  as np
 import pandas as pd
+import random 
+import time
 
 from   gym.utils import seeding
 from   io        import StringIO
@@ -135,7 +137,7 @@ class SolventXEnv(gym.Env):
                 self.obj.update_system(variables)
                 
                 #determine results
-                if not np.array_equal(prev_state, variables): #if state has changed
+                if not np.array_equal(prev_state, variables): #Oly calculate new reward if state has changed
                     try:
                         silence_function(self.obj.evaluate, self.obj.variables)
                         if False in self.obj.stage_status:
@@ -144,6 +146,7 @@ class SolventXEnv(gym.Env):
                             self.reward = -100
                         else:
                             self.reward = self.get_reward()
+
                     except:
                         print('Epoch Failed!')
                         self.convergence_failure = True
@@ -382,9 +385,14 @@ class SolventXEnv(gym.Env):
                   reward.append(rec_rewards[1+i])
                 else:
                   if recovery < 0.50:
-                    reward.append(-pow((1+abs(1-recovery)), 4))
+                    #reward.append(-pow((1+abs(1-recovery)), 4))
+                    reward.append(-abs(1-recovery))
+                    print(reward)
                   else:
-                    reward.append(min(1, recovery))
+                    if purity <0.985:
+                        reward.append(0)
+                    else:
+                        reward.append(min(1, recovery))
 
               if goal == 'Stages': #lower stages = better
                 col_rewards = []
@@ -522,7 +530,49 @@ class SolventXEnv(gym.Env):
 
         #print(reward, truncate_number(sum(reward))) #logging
         return truncate_number(sum(reward)) #remove imprecision
-
+    
+    def decipher_action(self,action):
+        """Map action to physical actions."""
+        
+        if action != 22:
+            index = action//2           #variable
+            action_type =  ['inc', 'dec'][action%2]  #increase/decrease
+            print(f'Index:{index},Variable:{self.observation_variables[index]}-{action_type}')
+        else:
+            print('Do Nothing')
+    
+    def show_design_performance(self):
+        """Show the purity and recovery of current recovery."""
+        
+        print(f'Purity:{self.obj.strip_pur[0]}')
+        print(f'Recovery:{self.obj.strip_recov[0]}')
+        
+    def evaluate(self,agent):
+        """Evaluate the environment."""
+        
+        done = False
+        action_count = 0
+        rewards = []
+        observation = self.reset()
+        start_time = time.time()
+        while not done: #take action
+            action_count += 1
+            action = agent(observation)   
+            self.decipher_action(action)
+            
+            observation, reward, done, _ = self.step(action) 
+            rewards.append(reward)
+            print(f'Reward:{reward}')
+            self.show_design_performance()
+        
+        print(f'Episode time:{time.time()-start_time}')
+        print(f'Final return:{sum(rewards)}')
+    
+    def dummy_agent(self,observation):
+        """A dummy agent which takes random actions."""
+        
+        return random.randint(0,self.action_space.n-1)
+    
     #shifts value along log scale either by inc or dec
     def shift_value(self, curVal, action):
         logscale = self.logscale

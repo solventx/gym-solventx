@@ -1,3 +1,0 @@
-bounds,(HA)2(org),H+ Extraction,H+ Scrub,H+ Strip,OA Extraction,OA Scrub,OA Strip,Recycle,Extraction,Scrub,Strip,Nd,Pr,Ce,La
-Lower,0.2,1.00E-05,1.00E-05,1.00E-05,0.5,0.5,0.5,0,2,2,2,4,1,2,3
-Upper,0.6,2,2,2,5.5,5.5,5.5,1,8,8,6,12,4,10,11

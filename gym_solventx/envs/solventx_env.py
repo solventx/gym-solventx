@@ -10,12 +10,16 @@ from   gym       import error, spaces, utils
 
 import matplotlib.pyplot                        as plt
 import gym_solventx.envs.methods.plotlyon      as pl
-import gym_solventx.envs.methods.solvent_sweep as ss
+import gym_solventx.envs.methods.solvent_sweep as sx
+
 #from   gym_solventx.envs.methods.ssgraph       
 #import create_graph as gen_graph
 
 class SolventXEnv(gym.Env):
     """SolventX environment."""
+    
+    recovery_threshold = 0.15
+    purity_threshold = 0.985
     
     def __init__(self, DISCRETE_REWARD=None, goals_list=None, bounds_file=None):
         
@@ -25,11 +29,11 @@ class SolventXEnv(gym.Env):
         self.goals_list        = goals_list
         self.DISCRETE_REWARD   = DISCRETE_REWARD
         self.name              ='gym_solventx-v0'
-        self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
+        #self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
+        n_actions = 23 
 
-        self.action_space      = spaces.Discrete(23)
-        self.action_stats      = {action_num: 0 for action_num in range(self.action_space.n)}
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.obj.variables),),dtype=np.float32)
+        #self.action_space      = spaces.Discrete(23)
+        #self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.obj.variables),),dtype=np.float32)
         self.observation_variables = [  '(HA)2(org)',
                                          'H+ Extraction',
                                          'H+ Scrub',
@@ -41,7 +45,11 @@ class SolventXEnv(gym.Env):
                                          'Extraction',
                                          'Scrub', 
                                          'Strip' ]
-
+        self.action_space      = spaces.Discrete(n_actions)
+        self.action_stats      = {action_num: 0 for action_num in range(self.action_space.n)}
+        
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)
+        
         if bounds_file:
             boundsDF = pd.read_csv(bounds_file)
             self.bounds = {}
@@ -85,18 +93,20 @@ class SolventXEnv(gym.Env):
         self.logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
           +[logscale_min-1]+[logscale_max+1]))
 
-        self.envstate = dict()
-        for i, var in enumerate(self.observation_variables):
-            self.envstate[var] = self.obj.variables[i]
+        self.envstate = {variable_key:0.0 for variable_key in self.observation_variables}
+        
+        #self.envstate = dict()
+        #for i, var in enumerate(self.observation_variables):
+        #    self.envstate[var] = self.obj.variables[i]
 
-        variables = self.obj.variables
-        self.obj.update_flows(variables)
-        self.obj.create_column(variables)
+        #variables = self.obj.variables
+        #self.obj.update_flows(variables)
+        #self.obj.create_column(variables)
 
-        silence_function(self.obj.evaluate, self.obj.variables)
-        self.invalid     = False
-        self.reward      = self.get_reward()
-        self.best_reward = self.reward
+        #silence_function(self.obj.evaluate, self.obj.variables)
+        #self.invalid     = False
+        #self.reward      = self.get_reward()
+        #self.best_reward = self.reward
 
     def step(self, action): #return observation, reward, done, info
         #if not self.done:
@@ -133,16 +143,21 @@ class SolventXEnv(gym.Env):
                 #update variables
                 prev_state = variables.copy()
                 variables[index] = mod_info[var_name]
-                self.update_env(mod_info)
-                self.obj.update_system(variables)
+                #self.update_env(mod_info)
+                self.envstate.update(mod_info)
+                #self.obj.update_system(variables)
                 
                 #determine results
                 if not np.array_equal(prev_state, variables): #Oly calculate new reward if state has changed
                     try:
-                        silence_function(self.obj.evaluate, self.obj.variables)
-                        if False in self.obj.stage_status:
+                        #silence_function(self.obj.evaluate, self.obj.variables)
+                        self.obj.evaluate_loop(x=variables)
+                        self.obj.reward()
+                        if False in self.obj.stage_status['Extraction-0'] or False in self.obj.stage_status['Scrub-0'] or False in self.obj.stage_status['Strip-0']:
                             
                             print('Equilibrium Failed! Invalid State Reached!')
+                            self.convergence_failure = True
+                            self.done   = True
                             self.reward = -100
                         else:
                             self.reward = self.get_reward()
@@ -200,8 +215,11 @@ class SolventXEnv(gym.Env):
         self.convergence_failure = False
         self.invalid           = False
         self.max_episode_steps = self.spec.max_episode_steps
-        self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
-
+        #self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
+        self.obj = sx.solvent_extraction() # instantiate object
+        self.obj.create_var_space(n_products=2, n_components=2, input_feeds=1,) #define variable space
+        variables = [0.0 for x in self.observation_variables]
+        #random.seed(100)
         #reset action stats
         for key in self.action_stats:
           self.action_stats[key] = 0
@@ -221,27 +239,30 @@ class SolventXEnv(gym.Env):
             rand = lower
           elif rand > upper:
             rand = upper
-          self.obj.variables[index] = rand
+          #self.obj.variables[index] = rand
+          variables[index] = rand
 
-        self.envstate = dict()
+        self.obj.evaluate_loop(x=variables)
+        self.obj.reward()
+        
+        #self.envstate = dict()
         for i, var in enumerate(self.observation_variables):
           self.envstate[var] = self.obj.variables[i]
 
-        variables = self.obj.variables
-        self.obj.update_flows(variables)
-        self.obj.create_column(variables)
+        
+        #self.obj.update_flows(variables)
+        #self.obj.create_column(variables)
 
-        try:
-          silence_function(self.obj.evaluate, self.obj.variables)  
-        except:
-          return self.reset()
+        #try:
+        #  silence_function(self.obj.evaluate, self.obj.variables)  
+        #except:
+        #  return self.reset()
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
 
         return self.obj.variables
-
-
+   
     def render(self, mode='human', create_graph_every=False):
         '''
         create_graph_every: steps per graph generation
@@ -356,25 +377,30 @@ class SolventXEnv(gym.Env):
             reward.append(-25)
 
           else:
+            # Nd recovery
+            recovery = self.obj.recovery['Strip-0'][self.obj.ree.index('Nd')]
+            # Nd purity
+            purity = self.obj.purity['Strip-0'][self.obj.ree.index('Nd')]
+            #print(recovery)
+            #print(purity)
             for goal in self.goals_list:
               if goal == 'Purity':
-                  purity = self.obj.strip_pur[0]
-                  #print(purity)
-                  if purity < .985:
+                  if purity < self.purity_threshold:
                     if self.DISCRETE_REWARD:
-                      reward.append(-1)
-                    else: 
-                      reward.append(-abs(1-purity))
+                        reward.append(-1)
+                    else:
+                        reward.append(-abs(1-purity))
                   else:
                     if self.DISCRETE_REWARD:
-                      reward.append(1)
+                        reward.append(1)
                     else:
-                      reward.append(min(1, purity))
+                        if recovery < self.recovery_threshold:
+                            reward.append(0)
+                        else:
+                            reward.append(min(1, purity))
 
               if goal == 'Recovery':
-                recovery  = self.obj.strip_recov[0]
-                #print(recovery)
-
+                
                 if self.DISCRETE_REWARD:
                   threshold     = [   0.5, 0.7, 0.8, 0.9, 0.99]
                   rec_rewards   = [0,  .5,  .7,  .8,  .9,    1] #0 if no threshold met
@@ -384,12 +410,11 @@ class SolventXEnv(gym.Env):
                       i = index
                   reward.append(rec_rewards[1+i])
                 else:
-                  if recovery < 0.50:
-                    #reward.append(-pow((1+abs(1-recovery)), 4))
+                  if recovery < self.recovery_threshold:
                     reward.append(-abs(1-recovery))
-                    print(reward)
+                    
                   else:
-                    if purity <0.985:
+                    if purity < self.purity_threshold:
                         reward.append(0)
                     else:
                         reward.append(min(1, recovery))
@@ -544,9 +569,17 @@ class SolventXEnv(gym.Env):
     def show_design_performance(self):
         """Show the purity and recovery of current recovery."""
         
-        print(f'Purity:{self.obj.strip_pur[0]}')
-        print(f'Recovery:{self.obj.strip_recov[0]}')
+        purity = self.obj.purity['Strip-0'][self.obj.ree.index('Nd')]
+        recovery = self.obj.recovery['Strip-0'][self.obj.ree.index('Nd')]
+        print(f'Purity:{purity}')
+        print(f'Recovery:{recovery}')
+    
+    def show_process_design(self,observation):
+        """Shown the current design."""
         
+        for i,state in enumerate(observation):
+            print(f'{self.observation_variables[i]}:{state:.4f}')    
+    
     def evaluate(self,agent):
         """Evaluate the environment."""
         

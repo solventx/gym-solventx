@@ -14,16 +14,18 @@ obj.create_var_space(n_products=2, n_components=2, input_feeds=1,) #define varia
 
 
 """ Evaluate column after action step """ #####################################
-obj.evaluate_loop(x=[0.5]*8 + [1]*3)
+#xtest = [0.2, 1e-05, 0.006498175348279338, 2, 3.9, 3.9, 4.35, 0.2, 5.0, 3.0, 3.0]
+xtest = [0.55, 0.00833634561948692, 3.474732914376938e-05, 0.9472773186187049, 1.5, 3.15, 3.55, 0.35, 6.0, 7.0, 6]
+obj.evaluate_loop(x=xtest)
 
 
 """ Get variables """ #########################################################
-obj.variables 
+print('Design:',obj.variables)
 #= [0.5,	0.5,	0.5, 0.5,	0.5,	0.5,	0.5,	0.5,	1,	1,	1]
 
 
 """ Get error status""" #######################################################
-obj.stage_status 
+print('Status:',obj.stage_status )
 #= {'Extraction-0': [True, True, True, True, True, True, True],
 # 'Scrub-0': [True, True, True, True, True, True, True, True],
 # 'Strip-0': [True, True, True, True]}
@@ -35,10 +37,10 @@ obj.reward()
 
 """ Get potential objectives""" ###############################################
 # Nd recovery
-obj.recovery['Strip-0'][obj.ree.index('Nd')]
+print('Recovery:',obj.recovery['Strip-0'][obj.ree.index('Nd')])
 
 # Nd purity
-obj.purity['Strip-0'][obj.ree.index('Nd')]
+print('Purity:',obj.purity['Strip-0'][obj.ree.index('Nd')])
 
 # Total Number of Stages
 sum(obj.Ns.values())

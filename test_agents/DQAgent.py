@@ -427,6 +427,7 @@ class DQAgent(Utilities):
                 action = self.predict(prev_envstate)
 
                 envstate, reward, done, info = self.env.step(action)
+                print('Step:{},reward:{}'.format(n_steps,reward))
 
                 episode = [prev_envstate, action, reward, envstate, done]
                 self.remember(episode)

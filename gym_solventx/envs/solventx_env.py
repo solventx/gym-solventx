@@ -8,12 +8,9 @@ from   gym.utils import seeding
 from   io        import StringIO
 from   gym       import error, spaces, utils
 
-import matplotlib.pyplot                        as plt
-import gym_solventx.envs.methods.plotlyon      as pl
-import gym_solventx.envs.methods.solvent_sweep as sx
-
-#from   gym_solventx.envs.methods.ssgraph       
-#import create_graph as gen_graph
+import matplotlib.pyplot as plt
+from solventx.methods import plotlyon
+from solventx.methods import solvent_sweep
 
 class SolventXEnv(gym.Env):
     """SolventX environment."""
@@ -23,100 +20,25 @@ class SolventXEnv(gym.Env):
     
     def __init__(self, DISCRETE_REWARD=None, goals_list=None, bounds_file=None):
         
-        self.steps             = 0
-        #self.last_action       = None
-        self.done              = False
         self.goals_list        = goals_list
         self.DISCRETE_REWARD   = DISCRETE_REWARD
         self.name              ='gym_solventx-v0'
-        #self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
-        n_actions = 23 
+        
+        bounds_dict = utilities.initialize_variable_bounds(bounds_file) #Get bounds dict
+        self.action_dict = utilities.create_action_dict(self.bounds_dict)
 
-        #self.action_space      = spaces.Discrete(23)
-        #self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.obj.variables),),dtype=np.float32)
-        self.observation_variables = [  '(HA)2(org)',
-                                         'H+ Extraction',
-                                         'H+ Scrub',
-                                         'H+ Strip',
-                                         'OA Extraction',
-                                         'OA Scrub',
-                                         'OA Strip', 
-                                         'Recycle',
-                                         'Extraction',
-                                         'Scrub', 
-                                         'Strip' ]
+        self.variable_bounds = bounds_dict['bounds']
+        self.incriment_bounds = bounds_dict['incriment_bounds']
+        self.observation_variables = self.variable_bounds.keys()
+        
+        n_actions =  len(self.action_dict)
         self.action_space      = spaces.Discrete(n_actions)
-        self.action_stats      = {action_num: 0 for action_num in range(self.action_space.n)}
-        
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)
-        
-        if bounds_file:
-            boundsDF = pd.read_csv(bounds_file)
-            self.bounds = {}
-            for var_name in self.observation_variables:
-                self.bounds[var_name] = {
-                                         'lower': boundsDF[[var_name]].iloc[0][0],
-                                         'upper': boundsDF[[var_name]].iloc[1][0]
-                                        }
-        else:
-            self.bounds = {
-            '(HA)2(org)':    {'lower': 0.2,      'upper': 0.6}, 
-            'H+ Extraction': {'lower': 1.00E-05, 'upper': 2  }, 
-            'H+ Scrub':      {'lower': 1.00E-05, 'upper': 2  }, 
-            'H+ Strip':      {'lower': 1.00E-05, 'upper': 2  }, 
-            'OA Extraction': {'lower': 0.5,      'upper': 5.5}, 
-            'OA Scrub':      {'lower': 0.5,      'upper': 5.5}, 
-            'OA Strip':      {'lower': 0.5,      'upper': 5.5}, 
-            'Recycle':       {'lower': 0,        'upper': 1  }, 
-            'Extraction':    {'lower': 2,        'upper': 8  }, 
-            'Scrub':         {'lower': 2,        'upper': 8  }, 
-            'Strip':         {'lower': 2,        'upper': 6  },
-          }
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)        
+       
+        self.envstate = {variable:0.0 for variable in self.observation_variables}              
 
-        self.inc_dict = { #increment dictionary
-          '(HA)2(org)':      .05,
-          'H+ Extraction':   None, #generator function, shift_value(), used instead
-          'H+ Scrub':        None, #generator function, shift_value(), used instead
-          'H+ Strip':        None, #generator function, shift_value(), used instead
-          'OA Extraction':   .05,
-          'OA Scrub':        .05,
-          'OA Strip':        .05,
-          'Recycle':         .05,
-          'Extraction':      1,
-          'Scrub':           1,
-          'Strip':           1,
-        }
-
-        logscale_min = min([self.bounds['H+ Extraction']['lower'], self.bounds['H+ Scrub']['lower'], self.bounds['H+ Strip']['lower']])
-        logscale_max = max([self.bounds['H+ Extraction']['upper'], self.bounds['H+ Scrub']['upper'], self.bounds['H+ Strip']['upper']])
-        #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
-        self.logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
-          +[logscale_min-1]+[logscale_max+1]))
-
-        self.envstate = {variable_key:0.0 for variable_key in self.observation_variables}
-        
-        #self.envstate = dict()
-        #for i, var in enumerate(self.observation_variables):
-        #    self.envstate[var] = self.obj.variables[i]
-
-        #variables = self.obj.variables
-        #self.obj.update_flows(variables)
-        #self.obj.create_column(variables)
-
-        #silence_function(self.obj.evaluate, self.obj.variables)
-        #self.invalid     = False
-        #self.reward      = self.get_reward()
-        #self.best_reward = self.reward
-
+   
     def step(self, action): #return observation, reward, done, info
-        #if not self.done:
-        #  #self.last_action = action
-        #  self.action_stats[action]+=1
-
-        #if action == self.action_space.n-1 or self.done: #last action = do nothing
-        #  self.invalid = False
-        #  self.reward  = self.get_reward()
-        #  self.update_env(None) #update actions count, but not state
         
         if self.done and self.convergence_failure:
             print(f'Convergence failure after {self.steps} - Reset environment to start new simulation!')
@@ -125,143 +47,89 @@ class SolventXEnv(gym.Env):
             print(f'Episode completed after {self.steps} steps - Reset environment to start new simulation!')
         
         elif not self.done: #Only perform step if episode has not ended
-            #map action to variable and action type
-            #print(self.action_stats,action)
-            #self.action_stats.update({action:self.action_stats[action]+1})
-            
+            self.action_stats.update({action:self.action_stats[action]+1})
             self.steps += 1
           
-            if action != 22:
-                index = action//2           #variable
-                action_type =  ['inc', 'dec'][action%2]  #increase/decrease
-                
-                variables        = self.obj.variables
-                var_name         = self.observation_variables[index]
-
-                #perform actions
-                mod_info           = self.perform_action(index, action_type)
-                #update variables
-                prev_state = variables.copy()
-                variables[index] = mod_info[var_name]
-                #self.update_env(mod_info)
-                self.envstate.update(mod_info)
-                #self.obj.update_system(variables)
-                
+            if self.action_dict[action]: #map action to variable and action type
+                prev_state = self.sx_design.variables.copy()   #save previous state
+                variable_type = list(self.action_dict[action].keys())[0] #From Python 3.6,dict maintains insertion order by default.
+                variable_delta = self.action_dict[action][variable_type]
+                variable_index = list(self.observation_variables).index(variable_type) 
+                self.sx_design.variables[variable_index] = max(min(self.sx_design.variables[variable_index] + variable_delta,self.variable_bounds['upper']),self.variable_bounds['lower']) #update variables
+            
                 #determine results
-                if not np.array_equal(prev_state, variables): #Oly calculate new reward if state has changed
-                    try:
-                        #silence_function(self.obj.evaluate, self.obj.variables)
-                        self.obj.evaluate_loop(x=variables)
-                        self.obj.reward()
-                        if False in self.obj.stage_status['Extraction-0'] or False in self.obj.stage_status['Scrub-0'] or False in self.obj.stage_status['Strip-0']:
-                            
-                            print('Equilibrium Failed! Invalid State Reached!')
-                            self.convergence_failure = True
-                            self.done   = True
-                            self.reward = -100
-                        else:
-                            self.reward = self.get_reward()
-
-                    except:
-                        print('Epoch Failed!')
+                try:
+                    self.sx_design.evaluate_loop(x=self.sx_design.variables)
+                    self.sx_design.reward()
+                    if False in self.sx_design.stage_status['Extraction-0'] or False in self.sx_design.stage_status['Scrub-0'] or False in self.sx_design.stage_status['Strip-0']:
+                        print('Equilibrium Failed! Invalid State Reached - Terminating environment!')
                         self.convergence_failure = True
                         self.done   = True
                         self.reward = -100
+                    else:
+                        self.reward = self.get_reward()
+
+                except:
+                    print('Solvent extraction design evaluation Failed - Terminating environment!')
+                    self.convergence_failure = True
+                    self.done   = True
+                    self.reward = -100
         
         if self.steps >= self.spec.max_episode_steps:
             self.done = True
         
-        return self.obj.variables, self.reward, self.done, {}
+        return self.sx_design.variables, self.reward, self.done, {}
 
-    def perform_action(self, index, action):
-        variables = self.obj.variables
-        var_name  = self.observation_variables[index]
-        inc       = self.inc_dict[var_name]
-
-        if action == 'inc':
-          if type(inc) == int:
-            newVal = int(variables[index] + inc)
-          elif type(inc) == float:
-            newVal = truncate_number(variables[index] + inc)
-          else:
-            newVal = self.shift_value(variables[index], 'inc')
-        elif action == 'dec':
-          if type(inc) == int:
-            newVal = int(variables[index] - inc)
-          elif type(inc) == float:
-            newVal = truncate_number(variables[index] - inc)
-          else:
-            newVal = self.shift_value(variables[index], 'dec')
-
-        if not self.isValid(var_name, newVal): #invalid state value attempted
-          self.invalid = True
-          bounds = self.bounds[var_name]
-          lower  = bounds['lower']
-          upper  = bounds['upper']
-
-          if newVal > upper:
-            newVal = upper
-          elif newVal < lower:
-            newVal = lower
-        else:
-          self.invalid = False
-
-        return {var_name: newVal}
+    def perform_action(self,action):
+        """Perform action"""
+        ##To be included.
+        pass
 
     def reset(self):
+        """Reset environment."""
+        
         self.steps             = 0
-        #self.last_action       = None
         self.done              = False
+       
         self.convergence_failure = False
         self.invalid           = False
         self.max_episode_steps = self.spec.max_episode_steps
-        #self.obj               = ss.solvent_extraction(scale=1, feedvol = .02)
-        self.obj = sx.solvent_extraction() # instantiate object
-        self.obj.create_var_space(n_products=2, n_components=2, input_feeds=1,) #define variable space
-        variables = [0.0 for x in self.observation_variables]
+       
+        self.sx_design = sx.solvent_extraction() # instantiate object
+        
+        self.sx_design.create_var_space(n_products=2, n_components=2, input_feeds=1,) #define variable space
+        variables = [0.0 for x in self.observation_variables] #Initialize all variables to zero
+        
         #random.seed(100)
         #reset action stats
-        for key in self.action_stats:
-          self.action_stats[key] = 0
+        self.action_stats = {action: 0 for action in range(self.action_space.n)}
 
         # Randomize initial values
         for index, var in enumerate(self.observation_variables):
-          inc    = self.inc_dict[var]
-          bounds = self.bounds[var]
-          lower  = bounds['lower']
-          upper  = bounds['upper']
-          if inc:
-            rand = random.uniform(lower, upper)
-            rand = round_nearest(rand, inc)
-          else:
-            rand = random.choice(self.logscale)
-          if rand < lower:
-            rand = lower
-          elif rand > upper:
-            rand = upper
-          #self.obj.variables[index] = rand
-          variables[index] = rand
+            lower  = self.bounds[var]['lower']
+            upper  = self.bounds[var]['upper']
+            random_variable = random.uniform(lower, upper)
+            random_variable = round(random_variable, 2)
+           
+            """
+            else:
+                rand = random.choice(self.logscale)
+                if rand < lower:
+                    rand = lower
+                elif rand > upper:
+                    rand = upper
+            """
+            variables[index] = random_variable
 
-        self.obj.evaluate_loop(x=variables)
-        self.obj.reward()
-        
-        #self.envstate = dict()
+        self.sx_design.evaluate_loop(x=variables)
+        self.sx_design.reward()
+
         for i, var in enumerate(self.observation_variables):
-          self.envstate[var] = self.obj.variables[i]
-
-        
-        #self.obj.update_flows(variables)
-        #self.obj.create_column(variables)
-
-        #try:
-        #  silence_function(self.obj.evaluate, self.obj.variables)  
-        #except:
-        #  return self.reset()
+            self.envstate[var] = self.sx_design.variables[i]
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
-
-        return self.obj.variables
+        return self.sx_design.variables
    
     def render(self, mode='human', create_graph_every=False):
         '''
@@ -272,49 +140,14 @@ class SolventXEnv(gym.Env):
         if mode == 'human':
             print(f'Action: {self.last_action}, Action Count: {self.steps}' + '\n' + \
             f'Observation: {self.envstate}' + '\n' + \
-            f'Purity: {self.obj.strip_pur[0]}' + '\n' + \
-            f'Recovery: {self.obj.strip_recov[0]}' + '\n' + \
+            f'Purity: {self.sx_design.strip_pur[0]}' + '\n' + \
+            f'Recovery: {self.sx_design.strip_recov[0]}' + '\n' + \
             f'Reward: {self.reward}' + '\n' + \
             f'Done: {self.done}' + '\n' + \
             '========\n\n\n'
           )
-        if self.done:
-            output += ''.join(['=' for x in range(80)])
-            output += f'\nObservation: {self.obj.variables}\n'
-            output += pretty_dict(self.envstate)
-            output += (f'Purity: {self.obj.strip_pur[0]}' + '\n')
-            output += (f'Recovery: {self.obj.strip_recov[0]}' + '\n')
-            output += f'Reward: {self.reward}'
-            output += ('\n' + ''.join(['=' for x in range(80)]) + '\n\n\n')
-            print(output)
-            pl.populate(self.obj) 
-
-        elif mode == 'file':
-            output = f'Action: {self.last_action}, Action Count: {self.steps}' + '\n' + \
-              f'Observation: {self.envstate}' + '\n' + \
-              f'Purity: {self.obj.strip_pur[0]}' + '\n' + \
-              f'Recovery: {self.obj.strip_recov[0]}' + '\n' + \
-              f'Reward: {self.reward}' + '\n' + \
-              f'Done: {self.done}' + '\n' + \
-              '========\n\n\n'
-        if self.done:
-            output += ''.join(['=' for x in range(80)])
-            output += f'\nObservation: {self.obj.variables}'
-            output += pretty_dict(self.envstate)
-            output += (f'Purity: {self.obj.strip_pur[0]}' + '\n')
-            output += (f'Recovery: {self.obj.strip_recov[0]}' + '\n')
-            output += f'Reward: {self.reward}'
-            output += ('\n' + ''.join(['=' for x in range(80)]) + '\n\n\n')
-            pl.populate(self.obj)
-
-        if create_graph_every:
-            if self.steps % int(create_graph_every) == 0:
-                self.create_graph(render=self.done, filename=f'ss_graph{self.steps}')
-
-        return (None, output)[mode=='file']
-
-    def create_graph(self, **kwargs):
-        gen_graph(self.obj, **kwargs)
+        
+        return self.sx_design.variables
 
     #determines if the new state value would be valid before updating state
     def isValid(self, var_name, newVal):
@@ -329,10 +162,6 @@ class SolventXEnv(gym.Env):
 
       #updates relevant variables after an action is performed
     def update_env(self, modInfo):
-        #if not self.done:
-        #    self.steps += 1
-            #if self.steps >= self.max_episode_steps:
-            #    self.done = True
         if modInfo:
             self.envstate.update(modInfo)
 
@@ -629,26 +458,7 @@ def pretty_dict(D):
     string += (str(key) + ': ' + str(D[key]) + '\n')
   return string
 
-#rounds number to the nearest value `nearest`
-#`nearest` must be between 0-1
-#round_nearest(1.2354, .01) -> 1.24
-def round_nearest(number, nearest=.05):
-  lower  = number // 1 #lower limit
-  upper  = lower +1    #upper limit
 
-  values = []          #possible values
-  curVal = lower
-  while curVal <= upper:
-    values.append(curVal)
-    curVal=truncate_number(curVal + nearest)
-  
-  if upper not in values:
-    values.append(upper)
-  
-  distance = []        #distance to each possible value
-  for value in values:
-    distance.append(abs(number-value))
-  return values[distance.index(min(distance))]
 
 #normalizes a set of data between a range
 def normalize(data, rangeMin, rangeMax):

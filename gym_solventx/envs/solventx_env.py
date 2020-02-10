@@ -18,18 +18,21 @@ class SolventXEnv(gym.Env):
     recovery_threshold = 0.15
     purity_threshold = 0.985
     
-    def __init__(self, DISCRETE_REWARD=None, goals_list=None, bounds_file=None):
+    def __init__(self, config_file=None):
         
-        self.goals_list        = goals_list
-        self.DISCRETE_REWARD   = DISCRETE_REWARD
         self.name              ='gym_solventx-v0'
         
-        bounds_dict = utilities.initialize_variable_bounds(bounds_file) #Get bounds dict
-        self.action_dict = utilities.create_action_dict(self.bounds_dict)
-
-        self.variable_bounds = bounds_dict['bounds']
-        self.incriment_bounds = bounds_dict['incriment_bounds']
-        self.observation_variables = self.variable_bounds.keys()
+        variable_dict = utilities.initialize_config_dict(config_file) #Get bounds dict
+        self.variable_config = variable_dict['variable_config']
+        self.process_config = variable_dict['process_config']
+        self.environment_config = variable_dict['environment_config']
+        self.logscale = variable_dict['logscale']
+        
+        self.goals_list        = self.environment_config['goals_list']
+        self.DISCRETE_REWARD   = self.environment_config['discrete_reward']
+        
+        self.action_dict = utilities.create_action_dict(self.variable_config)
+        self.observation_variables = self.variable_config.keys()
         
         n_actions =  len(self.action_dict)
         self.action_space      = spaces.Discrete(n_actions)
@@ -55,7 +58,7 @@ class SolventXEnv(gym.Env):
                 variable_type = list(self.action_dict[action].keys())[0] #From Python 3.6,dict maintains insertion order by default.
                 variable_delta = self.action_dict[action][variable_type]
                 variable_index = list(self.observation_variables).index(variable_type) 
-                self.sx_design.variables[variable_index] = max(min(self.sx_design.variables[variable_index] + variable_delta,self.variable_bounds['upper']),self.variable_bounds['lower']) #update variables
+                self.sx_design.variables[variable_index] = max(min(self.sx_design.variables[variable_index] + variable_delta,self.variable_config[variable_type]['upper']),self.variable_config[variable_type]['lower']) #update variables
             
                 #determine results
                 try:
@@ -97,28 +100,29 @@ class SolventXEnv(gym.Env):
        
         self.sx_design = sx.solvent_extraction() # instantiate object
         
-        self.sx_design.create_var_space(n_products=2, n_components=2, input_feeds=1,) #define variable space
+        self.sx_design.create_var_space(n_products=self.process_config['n_products'],
+                                        n_components=self.process_config['n_components'],
+                                        input_feeds=self.process_config['input_feeds'],) #define variable space
         variables = [0.0 for x in self.observation_variables] #Initialize all variables to zero
         
-        #random.seed(100)
+        if not self.environment_config['randomize']:
+            random.seed(100) #Keep same seed every episode environment should not be randomized
+            
         #reset action stats
         self.action_stats = {action: 0 for action in range(self.action_space.n)}
 
         # Randomize initial values
-        for index, var in enumerate(self.observation_variables):
-            lower  = self.bounds[var]['lower']
-            upper  = self.bounds[var]['upper']
-            random_variable = random.uniform(lower, upper)
-            random_variable = round(random_variable, 2)
-           
-            """
-            else:
-                rand = random.choice(self.logscale)
-                if rand < lower:
-                    rand = lower
-                elif rand > upper:
-                    rand = upper
-            """
+        for index, variable in enumerate(self.observation_variables):
+            lower_bound  = self.variable_config[variable]['lower']
+            upper_bound  = self.variable_config[variable]['upper']
+                
+            if self.variable_config[variable]['scale']  is 'linear':
+                random_variable = random.uniform(lower, upper)
+                random_variable = round(random_variable, 3)
+            elif self.variable_config[variable]['scale']  is 'log':
+                random_variable = random.choice(self.logscale)
+                random_variable = max(min(random_variable,lower_bound),upper_bound)
+              
             variables[index] = random_variable
 
         self.sx_design.evaluate_loop(x=variables)

@@ -1,80 +1,53 @@
 #Utility functions for Gym
 import pandas as pd
+import json
 
+def read_config(file_name):
+    """Load config json file and return dictionary."""
+    
+    with open(file_name, "r") as config_file:
+        print(f'Reading configuration file:{config_file.name}')
+        confDict = json.load(config_file)
+        
+    return confDict
 
-
-
-variable_types = ['(HA)2(org)',
-                              'H+ Extraction',
-                                         'H+ Scrub',
-                                         'H+ Strip',
-                                         'OA Extraction',
-                                         'OA Scrub',
-                                         'OA Strip', 
-                                         'Recycle',
-                                         'Extraction',
-                                         'Scrub', 
-                                         'Strip' ]
-def initialize_variable_bounds(bounds_file):
+def initialize_variable_bounds(config_file):
     """Observation bounds."""
     
-    if bounds_file:
-        boundsDF = pd.read_csv(bounds_file)
-        bounds = {}
-        for var_name in observation_variables:
-            bounds[var_name] = {'lower': boundsDF[[var_name]].iloc[0][0],
-                                'upper': boundsDF[[var_name]].iloc[1][0]
-                               }
-    else:
-        bounds = {
-                '(HA)2(org)':    {'lower': 0.2,      'upper': 0.6}, 
-                'H+ Extraction': {'lower': 1.00E-05, 'upper': 2  }, 
-                'H+ Scrub':      {'lower': 1.00E-05, 'upper': 2  }, 
-                'H+ Strip':      {'lower': 1.00E-05, 'upper': 2  }, 
-                'OA Extraction': {'lower': 0.5,      'upper': 5.5}, 
-                'OA Scrub':      {'lower': 0.5,      'upper': 5.5}, 
-                'OA Strip':      {'lower': 0.5,      'upper': 5.5}, 
-                'Recycle':       {'lower': 0,        'upper': 1  }, 
-                'Extraction':    {'lower': 2,        'upper': 8  }, 
-                'Scrub':         {'lower': 2,        'upper': 8  }, 
-                'Strip':         {'lower': 2,        'upper': 6  },
-              }
-
-        incriment_bounds = { #increment dictionary
-          '(HA)2(org)':      .05,
-          'H+ Extraction':   None, #generator function, shift_value(), used instead
-          'H+ Scrub':        None, #generator function, shift_value(), used instead
-          'H+ Strip':        None, #generator function, shift_value(), used instead
-          'OA Extraction':   .05,
-          'OA Scrub':        .05,
-          'OA Strip':        .05,
-          'Recycle':         .05,
-          'Extraction':      1,
-          'Scrub':           1,
-          'Strip':           1,
-        }
-        assert len(bounds) == incriment_bounds, 'Number of elements should be equal.'
-        logscale_min = min([bounds['H+ Extraction']['lower'], bounds['H+ Scrub']['lower'], bounds['H+ Strip']['lower']])
-        logscale_max = max([bounds['H+ Extraction']['upper'], bounds['H+ Scrub']['upper'], bounds['H+ Strip']['upper']])
-        #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
-        logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
+    assert 'json' in config_file, 'Config file must be a json file!'
+                               
+    design_config = read_config(config_file)
+    
+    variable_config = design_config['variable_config']
+    process_config = design_config['process_config']
+    environment_config = design_config['environment_config']   
+    
+    
+    logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
+    logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])
+    
+    #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
+    logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
           +[logscale_min-1]+[logscale_max+1]))
         
-    return {'bounds':bounds,'incriment_bounds':incriment_bounds,'logscale':logscale}    
+    return {'variable_config':variable_config,'logscale':logscale,'environment_config':environment_config}    
 
-action_dict
-def create_action_dict(bounds_dict):
+
+def create_action_dict(variable_config):
     """Create a dictionary of discrete actions."""
     """{1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
     
     action_dict = {}
+    action_levels = 2
+    direction = 1
     i = 1
-    for key in bounds_dict['bounds'].keys():
-        action_dict[i][key]=bounds_dict['incriment_bounds'][key]
-        i = i+1
-        action_dict[i][key]=-bounds_dict['incriment_bounds'][key]
-    
-    action_dict.update({0:0.0})
+    for key in variable_config.keys():
+        for j in range(action_levels):
+            action_dict[j][key] = direction*variable_config[key]['incriment'][key]
+            direction = direction*-1
+            i = i+1
+            
+    action_dict.update({0:''})
     return action_dict
         
 

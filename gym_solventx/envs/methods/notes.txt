@@ -1,3 +1,0 @@
-Solvent extraction code modified to implement closed-loop recycle from strip to scrub column
-- ssgraph will not work and needs to be updated to reflect new code structure
-- plotlyon will not work and needs to be updated to reflect new code structure

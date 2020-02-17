@@ -11,8 +11,8 @@ def read_config(file_name):
         
     return confDict
 
-def initialize_variable_bounds(config_file):
-    """Observation bounds."""
+def get_config_dict(config_file):
+    """Read config file create confi dict."""
     
     assert 'json' in config_file, 'Config file must be a json file!'
                                
@@ -33,24 +33,43 @@ def initialize_variable_bounds(config_file):
     return {'variable_config':variable_config,'logscale':logscale,'environment_config':environment_config}    
 
 
-def create_action_dict(variable_config):
+def create_action_dict(variable_config,environment_config):
     """Create a dictionary of discrete actions."""
-    """{1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
+    """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
     
     action_dict = {}
-    action_levels = 2
+    n_increment_actions = environment_config['increment_actions_per_variable']
+    n_decrement_actions = environment_config['decrement_actions_per_variable']
+    
     direction = 1
     i = 1
     for key in variable_config.keys():
-        for j in range(action_levels):
-            action_dict[j][key] = direction*variable_config[key]['incriment'][key]
-            direction = direction*-1
-            i = i+1
-            
-    action_dict.update({0:''})
-    return action_dict
-        
+        if n_increment_actions>0:
+            for j in range(1,n_increment_actions+1):
+                if variable_config[key]['scale'] is 'linear':
+                    action_dict[i][key] = j*variable_config[key]['delta']
+                elif variable_config[key]['scale'] is 'log':
+                    action_dict[i][key] = 10**(j*variable_config[key]['delta']) #Convert log to actual number
+                i = i+1
+        if n_decrement_actions>0:
+            for k in range(1,n_decrement_actions+1):
+                if variable_config[key]['scale'] is 'linear':
+                    action_dict[i][key] = k*variable_config[key]['delta']
+                elif variable_config[key]['scale'] is 'log':
+                    action_dict[i][key] = -10**(k*variable_config[key]['delta']) #Convert log to actual number
+                i = i+1
 
+    action_dict.update({0:{}})
+    return action_dict
+
+def create_variables_list(variable_config,environment_config):
+    """Create a list of all design variables in every stage."""
+    
+    observation_variables = self.variable_config.keys()
+    
+    return observation_variables
+    
+    
 #rounds number to the nearest value `nearest`
 #`nearest` must be between 0-1
 #round_nearest(1.2354, .01) -> 1.24
@@ -71,6 +90,50 @@ def round_nearest(number, nearest=.05):
   for value in values:
     distance.append(abs(number-value))
   return values[distance.index(min(distance))]
+
+
+
+#removes imprecision issues with floats: 1-.1 = .900000000001 => 1-.1 = .9
+def truncate_number(f_number, n_decimals=6):
+  strFormNum = "{0:." + str(n_decimals+5) + "f}"
+  trunc_num  = float(strFormNum.format(f_number)[:-5])
+  return(trunc_num)
+
+def pretty_dict(D):
+  string = ''
+  for key in D:
+    string += (str(key) + ': ' + str(D[key]) + '\n')
+  return string
+
+
+
+#normalizes a set of data between a range
+def normalize(data, rangeMin, rangeMax):
+  if(rangeMin>rangeMax):
+    raise ValueError('Invalid Ranges')
+  newVals = []
+  maxVal=max(data)
+  minVal=min(data)
+  for val in data:
+    if maxVal-minVal == 0:
+      newVals.append(rangeMin)
+    else: 
+      newVals.append((rangeMax-rangeMin)*(val-minVal)/(maxVal-minVal)+rangeMin)
+  return newVals
+
+def silence_function(func, *args, **kwargs):
+  '''
+    Replaces stdout temporarily to silence print statements inside a function
+  '''
+  #mask standard output
+  actualstdout = sys.stdout
+  sys.stdout   = StringIO()
+
+  try:
+    func(*args, **kwargs)
+  finally: #set stdout but dont catch error
+    sys.stdout = actualstdout
+
 
 
 """
@@ -128,4 +191,21 @@ def render(self, mode='human', create_graph_every=False):
  
 def create_graph(self, **kwargs):
     gen_graph(self.obj, **kwargs)
+
+
+ #determines if the new state value would be valid before updating state
+    def isValid(self, var_name, newVal):
+        bounds = self.bounds[var_name]
+        lower  = bounds['lower']
+        upper  = bounds['upper']
+
+        if lower <= newVal <= upper:
+            return True
+
+        return False
+
+      #updates relevant variables after an action is performed
+    def update_env(self, modInfo):
+        if modInfo:
+            self.envstate.update(modInfo)
 """

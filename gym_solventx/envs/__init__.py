@@ -1,1 +1,1 @@
-from gym_solventx.envs.solventx_env import SolventXEnv
+from gym_solventx.envs.solventx import SolventXEnv

@@ -9,15 +9,14 @@
                     "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear"  }, 
                     "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"linear"  }, 
                     "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"linear"  }, 
-                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"linear"  },
+                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"linear"  }
                    },
                  
-"process_config":{"n_products":2,
-                 "n_components":2,
-                 "input_feeds":1
-                 },
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\gym-solventx\\process_design_config.json"},
+    
 "environment_config":{"randomize":true,"goals_list":[],
                       "increment_actions_per_variable":2,"decrement_actions_per_variable":1,
                       "max_episode_steps":500},
+    
 "reward_config":{"discrete_reward":false,"thresholds":{"recovery":0.15,"purity":0.985}}
 }

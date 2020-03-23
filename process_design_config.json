@@ -1,0 +1,15 @@
+{
+"solventxHome": "C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx",
+"csvData":{"dfree":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\data\\csv\\sxvinput.csv",
+           "main_sx_feed":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\data\\csv\\mainsxflow.csv",
+           "mw":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\data\\csv\\mw.csv",
+           "ndprcela":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\data\\csv\\ndprcela.csv"
+          },
+"xmlData":{"xml":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\data\\xml","phase":"PC88A_HCL"},
+   
+"solvents": ["H2O(L)", "(HA)2(org)", "dodecane"],
+"modules":{"input":["Nd","Pr","Ce","La"],
+           "output":{"strip":["Nd","Ce"]}
+          },
+"phasenames":["HCl_electrolyte","PC88A_liquid"]
+}

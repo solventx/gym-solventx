@@ -1,5 +1,7 @@
 #Utility functions for Gym
 import pandas as pd
+import numpy  as np
+import math
 import json
 
 def read_config(file_name):
@@ -15,22 +17,31 @@ def get_config_dict(config_file):
     """Read config file create confi dict."""
     
     assert 'json' in config_file, 'Config file must be a json file!'
+    config_keys = ['variable_config','process_config','environment_config','reward_config']
                                
     design_config = read_config(config_file)
     
-    variable_config = design_config['variable_config']
-    process_config = design_config['process_config']
-    environment_config = design_config['environment_config']   
-    
-    
+    config_dict = {}
+    for key in config_keys:
+        if key in design_config.keys():
+            config_dict.update({key:design_config[key]})
+        else:
+            raise ValueError(f'{key} not found in config JSON file!')
+    #variable_config = design_config['variable_config']
+    #process_config = design_config['process_config']
+    #environment_config = design_config['environment_config']   
+
+    variable_config= config_dict['variable_config']
     logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
     logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])
     
     #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
     logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
           +[logscale_min-1]+[logscale_max+1]))
-        
-    return {'variable_config':variable_config,'logscale':logscale,'environment_config':environment_config}    
+    
+    config_dict.update({'logscale':logscale})   
+    
+    return config_dict    
 
 
 def create_action_dict(variable_config,environment_config):
@@ -65,7 +76,7 @@ def create_action_dict(variable_config,environment_config):
 def create_variables_list(variable_config,environment_config):
     """Create a list of all design variables in every stage."""
     
-    observation_variables = self.variable_config.keys()
+    observation_variables = variable_config.keys()
     
     return observation_variables
     

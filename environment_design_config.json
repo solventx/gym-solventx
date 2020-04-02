@@ -14,9 +14,23 @@
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\gym-solventx\\process_design_config.json"},
     
-"environment_config":{"randomize":true,"goals_list":[],
+"environment_config":{"randomize":true,"goals":["recovery","purity"],
                       "increment_actions_per_variable":2,"decrement_actions_per_variable":1,
                       "max_episode_steps":500},
     
-"reward_config":{"discrete_reward":false,"thresholds":{"recovery":0.15,"purity":0.985}}
+"reward_config":{"discrete_reward":false,
+                 "metrics":{"recovery":{"0":{"threshold":0.5,"reward":0.0},
+                                      "1":{"threshold":0.8,"reward":"-abs(1-metric)"},
+                                      "2":{"threshold":0.9,"reward":1}
+                                     },
+                           "purity":{"0":{"threshold":0.9,"reward":0.0},
+                                    "1":{"threshold":0.985,"reward":"-abs(1-metric)"},
+                                    "2":{"threshold":0.985,"reward":1.0}
+                                   },
+                           "stages":{"0":{"threshold":1,"reward":0.0},
+                                    "1":{"threshold":5,"reward":"1/metric"},
+                                    "2":{"threshold":8,"reward":-1.0}
+                                   }
+                         }
+                }
 }

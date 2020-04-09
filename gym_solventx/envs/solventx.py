@@ -10,7 +10,7 @@ from   gym       import error, spaces, utils
 
 import matplotlib.pyplot as plt
 from solventx import solventx
-from gym_solventx.envs import utilities,config
+from gym_solventx.envs import utilities#,config
 
 #from solventx.methods import solvent_sweep
 
@@ -145,21 +145,21 @@ class SolventXEnv(gym.Env):
         self.max_episode_steps = min(self.environment_config['max_episode_steps'],self.spec.max_episode_steps)
         self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
         self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
-        self.modules,x0,n_components= self.get_process() #Get initial values of variables and inputs
-        self.sx_design.create_var_space(x0,n_components) #define variable space
-        print(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{n_components}')
+        self.solventx.get_process() #Get initial values of variables and inputs
+        self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
+        print(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
         self.initialize_design_variables()
+        self.sx_design.evaluate_open(self.sx_design.design_variables) # 
         self.sx_design.reward()
         
-        self.metrics =  dict((key, {}) for key in self.reward_config['metrics'].keys())    
         
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
         return self.sx_design.x
-   
+    """
     def get_process(self):
-        """Get products."""
+        Get products.
         
         #print(self.process_config,self.sx_design.confDict)
         
@@ -194,7 +194,7 @@ class SolventXEnv(gym.Env):
         print(f'x0:{x}')
         
         return modules,x,n_components
-    
+    """
     def initialize_design_variables(self):
         """Initialize design variables."""
                

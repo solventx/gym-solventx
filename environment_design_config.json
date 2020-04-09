@@ -19,17 +19,17 @@
                       "max_episode_steps":500},
     
 "reward_config":{"discrete_reward":false,
-                 "metrics":{"recovery":{"0":{"threshold":0.5,"reward":0.0},
-                                      "1":{"threshold":0.8,"reward":"-abs(1-metric)"},
-                                      "2":{"threshold":0.9,"reward":1}
-                                     },
-                           "purity":{"0":{"threshold":0.9,"reward":0.0},
-                                    "1":{"threshold":0.985,"reward":"-abs(1-metric)"},
-                                    "2":{"threshold":0.985,"reward":1.0}
+                 "metrics":{"recovery":{"max":{"reward":1.0},
+                                        "0":{"threshold":0.5,"reward":0.0},
+                                        "1":{"threshold":0.85,"reward":"abs(1-metric)"}
+                                       }, 
+                           "purity":{"max":{"reward":1.0},
+                                    "0":{"threshold":0.9,"reward":0.0},
+                                    "1":{"threshold":0.985,"reward":"abs(1-metric)"}
                                    },
-                           "stages":{"0":{"threshold":1,"reward":0.0},
-                                    "1":{"threshold":5,"reward":"1/metric"},
-                                    "2":{"threshold":8,"reward":-1.0}
+                           "profit":{"0":{"threshold":1,"reward":0.0},
+                                    "1":{"threshold":0.5,"reward":"metric"},
+                                    "2":{"threshold":0.9,"reward":1.0}
                                    }
                          }
                 }

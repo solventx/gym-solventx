@@ -151,6 +151,8 @@ class SolventXEnv(gym.Env):
         self.initialize_design_variables()
         self.sx_design.reward()
         
+        self.metrics =  dict((key, {}) for key in self.reward_config['metrics'].keys())    
+        
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
@@ -227,39 +229,50 @@ class SolventXEnv(gym.Env):
             metrics.update({metric:{}})
             for element in self.sx_design.confDict['modules']['output']['strip']: #Extract value for each element
                 if metric == 'recovery':
-                   metric_value = self.obj.recovery['Strip-0'][self.obj.ree.index(element)] #Recovery 
+                    metric_value = self.sx_design.recovery[element] #Recovery  self.sx_design.recovery['Strip-0'][self.obj.ree.index(element)] #Recovery
+                    metrics[metric].update({element:metric_value})
                 elif metric == 'purity':
-                   metric_value = self.obj.purity['Strip-0'][self.obj.ree.index(element)] #Purity
+                    metric_value = self.sx_design.purity[element] #Purity self.sx_design.purity['Strip-0'][self.obj.ree.index(element)]
+                    metrics[metric].update({element:metric_value})
+                elif metric == 'profit':
+                    metric_value = self.sx_design.profit[element] #Profit
+                    metrics[metric].update({element:metric_value})
+                
                 else:
                     raise ValueError(f'{metric} is an invalid metric!')
                
-                metrics[metric].update({element:metric_value}) #{'recovery':{'Nd':0.1,'Pr':0.1}}
+        return metrics #{'recovery':{'Nd':0.1,'Pr':0.1},'profit':{'Nd':0.1,'Pr':0.1}}
     
     def get_reward(self):
         """Calculate and return reward."""
         
         rewards = []
         metric_sum = 0.0
-        metric_dict = self.get_metrics()
+        metric_dict = self.get_metrics() #{'recovery':{'Nd':0.1,'Pr':0.1},'profit':{'Nd':0.1,'Pr':0.1}}
         
         for goal in self.environment_config['goals']:
             if goal not in self.reward_config['metrics']:
                 raise ValueError(f'{goal} is not found in reward config!')
             
-            metric_type= metric_dict[goal]
+            metric_type= metric_dict[goal] #{'Nd':0.1,'Pr':0.1}}
                 
             for element,metric in metric_type.items():
-                for _,metric_config in self.reward_config['metrics'][goal].item():
-                    if metric < metric_config['threshold']:
-                        if isinstance(metric_config['threshold']['reward'],(int,float)):
-                            metric = metric_config['threshold']['reward']
-                        elif isinstance(metric_config['threshold']['reward'],str):
-                            metric = eval(metric_config['threshold']['reward'])
+                for _,metric_config in self.reward_config['metrics'][goal].items():
+                    if 'threshold' in metric_config:
+                        if metric < metric_config['threshold']: #Check if metric below threshold
+                            metric_reward = metric_config['reward']
                         else:
-                            raise(f'{metric_config["threshold"]["reward"]} is an invalid reward!')
-                metric_sum = metric_sum +  metric
+                            metric_reward = self.reward_config['metrics'][goal]['max']['reward'] #Assign maximum value if above threshold
+                if isinstance(metric_config['reward'],(int,float)):
+                    metric_reward = metric_config['reward']
+                elif isinstance(metric_config['reward'],str):
+                    metric_reward = eval(metric_config['reward'])
+                else:
+                    raise(f'{metric_config["reward"]} is an invalid reward for element:{element}!')    
+                
+                metric_sum = metric_sum +  metric_reward #Sum reward for each element
             
-            rewards.append(metric_sum) #Append reward for each goal
+            rewards.append(metric_sum) #Append reward for each goal -[0.4,0.9]
             
         return sum(rewards) #Sum rewards for all goals
     

@@ -3,6 +3,9 @@ import pandas as pd
 import numpy  as np
 import math
 import json
+import logging
+
+from gym_solventx.envs import templates
 
 def read_config(file_name):
     """Load config json file and return dictionary."""
@@ -13,12 +16,21 @@ def read_config(file_name):
         
     return confDict
 
+def get_logger(config_dict,instance):
+    """Initialize logger."""
+    
+    logger = logging.getLogger (__name__)#(type(instance).__name__)
+    logging_level = config_dict['logging_config']['verbosity']
+    logger.setLevel(eval('logging.'+logging_level)) 
+    print(f'Logging level:{logger.level}')    
+    return logger
+
 def get_config_dict(config_file):
     """Read config file create confi dict."""
     
     assert 'json' in config_file, 'Config file must be a json file!'
-    config_keys = ['variable_config','process_config','environment_config','reward_config']
-                               
+    config_keys = templates.config_keys
+    
     design_config = read_config(config_file)
     
     config_dict = {}
@@ -27,10 +39,7 @@ def get_config_dict(config_file):
             config_dict.update({key:design_config[key]})
         else:
             raise ValueError(f'{key} not found in config JSON file!')
-    #variable_config = design_config['variable_config']
-    #process_config = design_config['process_config']
-    #environment_config = design_config['environment_config']   
-
+   
     variable_config= config_dict['variable_config']
     logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
     logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])

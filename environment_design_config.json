@@ -12,25 +12,21 @@
                     "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"linear"  }
                    },
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\gym-solventx\\process_design_config.json"},
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
 "environment_config":{"randomize":true,"goals":["recovery","purity"],
                       "increment_actions_per_variable":2,"decrement_actions_per_variable":1,
                       "max_episode_steps":500},
-    
-"reward_config":{"discrete_reward":false,
-                 "metrics":{"recovery":{"max":{"reward":1.0},
-                                        "0":{"threshold":0.5,"reward":0.0},
-                                        "1":{"threshold":0.85,"reward":"abs(1-metric)"}
+"logging_config":{"verbosity":"INFO"},
+"reward_config":{"discrete_reward":false,"min":-1.0,
+                 "metrics":{"recovery":{"0":{"threshold":0.5,"reward":0.0},
+                                        "1":{"threshold":0.6,"reward":"abs(1-metric)"},
+                                        "2":{"threshold":0.85,"reward":"metric"}
                                        }, 
-                           "purity":{"max":{"reward":1.0},
-                                    "0":{"threshold":0.9,"reward":0.0},
-                                    "1":{"threshold":0.985,"reward":"abs(1-metric)"}
-                                   },
-                           "profit":{"0":{"threshold":1,"reward":0.0},
-                                    "1":{"threshold":0.5,"reward":"metric"},
-                                    "2":{"threshold":0.9,"reward":1.0}
-                                   }
+                           "purity":{"0":{"threshold":0.9,"reward":0.0},
+                                    "1":{"threshold":0.985,"reward":"abs(1-metric)"},
+                                    "2":{"threshold":0.995,"reward":"metric"}
+                                   }                                   
                          }
                 }
 }

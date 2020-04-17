@@ -19,7 +19,7 @@ class SolventXEnv(gym.Env):
     
     count = 0
     
-    def __init__(self, config_file=None):
+    def __init__(self, config_file):
         """Creates an instance of `SolventXEnv`.
         
         Args:
@@ -36,7 +36,9 @@ class SolventXEnv(gym.Env):
         
         self.name              ='gym_solventx-v0'
         
-        config_dict = utilities.get_config_dict(config_file) #Get bounds dict
+        config_dict = utilities.get_config_dict(config_file) #Get configuration dictionary
+        self.logger = utilities.get_logger(config_dict,self)
+        self.logger.info('Creating process design environment!')        
         
         self.variable_config = config_dict['variable_config']
         self.process_config = config_dict['process_config']
@@ -44,10 +46,7 @@ class SolventXEnv(gym.Env):
         self.reward_config = config_dict['reward_config']
         self.logscale = config_dict['logscale']
         
-       
-        
-        self.goals_list        = self.environment_config['goals_list']
-        self.discrete_reward   = self.reward_config['discrete_reward']
+        self.check_reward_config()        
         
         self.action_dict = utilities.create_action_dict(self.variable_config,self.environment_config)
         self.observation_variables = utilities.create_variables_list(self.variable_config,self.environment_config)       
@@ -61,6 +60,7 @@ class SolventXEnv(gym.Env):
         
         return {self.observation_variables[i]: self.sx_design.x[i] for i in range(len(self.observation_variables))} 
     
+    
     def step(self, action): #return observation, reward, done, info
         
         if not self.done: #Only perform step if episode has not ended
@@ -72,8 +72,7 @@ class SolventXEnv(gym.Env):
                 self.perform_action(action) #map action to variable and action type
                 
                 try: #Solve design and check for convergence
-                    self.sx_design.evaluate_loop(x=self.sx_design.variables)
-                    self.sx_design.reward()
+                    self.sx_design.evaluate_open(x=self.sx_design.variables)
                     self.check_design_convergence()
                     
                     if not self.convergence_failure:
@@ -101,6 +100,14 @@ class SolventXEnv(gym.Env):
         
         return self.sx_design.x, self.reward, self.done, {}
 
+    def check_design_convergence(self):
+        """Perform action"""
+        
+        if not all(self.sx_design.status.values):
+            #raise ValueError('Equilibrium Failed! Invalid State Reached - Terminating environment!')
+            print('Equilibrium Failed! Invalid State Reached - Terminating environment!')
+            self.convergence_failure = True    
+    
     def perform_action(self,action):
         """Perform action"""
         
@@ -122,17 +129,10 @@ class SolventXEnv(gym.Env):
         x_upper_limit = self.variable_config[x_type]['upper']
         x_lower_limit = self.variable_config[x_type]['lower']
         x_index = list(self.observation_variables).index(x_type)  #Get variable index
-        new_x_value = self.sx_design.x[x_index] + delta_x
+        new_x_value = self.sx_design.design_variables[x_index] + delta_x
         
-        self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
-    
-    def update_design_convergence(self):
-        """Check design convergence."""
+        self.sx_design.design_variables[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
         
-        if False in self.sx_design.stage_status['Extraction-0'] or False in self.sx_design.stage_status['Scrub-0'] or False in self.sx_design.stage_status['Strip-0']:
-            print('Equilibrium Failed! Invalid State Reached - Terminating environment!')
-            self.convergence_failure = True
-    
     def reset(self):
         """Reset environment."""
         
@@ -145,64 +145,35 @@ class SolventXEnv(gym.Env):
         self.max_episode_steps = min(self.environment_config['max_episode_steps'],self.spec.max_episode_steps)
         self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
         self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
-        self.solventx.get_process() #Get initial values of variables and inputs
+        self.sx_design.get_process() #Get initial values of variables and inputs
+        self.strip_groups = self.get_strip_groups()
         self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
-        print(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
+        self.logger.debug(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
         self.initialize_design_variables()
         self.sx_design.evaluate_open(self.sx_design.design_variables) # 
-        self.sx_design.reward()
-        
-        
+                
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
         return self.sx_design.x
-    """
-    def get_process(self):
-        Get products.
+   
+    def get_strip_groups(self):
+        """Initialize design variables."""
         
-        #print(self.process_config,self.sx_design.confDict)
+        strip_groups = {}
         
-        input_components = self.sx_design.confDict['modules']['input']
-        strip_components = self.sx_design.confDict['modules']['output']['strip']
-        #extraction_components = self.sx_design.confDict['modules']['output']['extraction']
-        n_components = len(input_components)
-        config_key = ''
+        for module in self.sx_design.modules:
+            strip_groups.update({module:self.sx_design.modules[module]['strip_group']})
         
-        print(f'Looping through following modules config:{list(config.valid_processes.keys())}')
-        for key,config_dict in config.valid_processes.items():
-            
-           
-            if set(input_components) == set(config_dict['input']):
-                if set(strip_components) ==  set(config_dict['strip']):
-                    
-                    config_key = key
-        
-        if config_key:
-            print(f'Found the following process config:{config_key}')            
-        else:
-            raise ValueError(f'No configuration found for input:{input_components},strip:{strip_components}!')            
-       
-        modules = config.valid_processes[config_key]['modules']
-        x = []
-       
-        print(f'Process config {config_key}:Input:{input_components},Number of modules:{len(modules)}')
-        print('Modules info:')
-        for key,module in modules.items():
-            x.extend(module['x'])
-            print(f'Module {key}:{module["strip_group"]}')
-        print(f'x0:{x}')
-        
-        return modules,x,n_components
-    """
+        return strip_groups
+    
     def initialize_design_variables(self):
         """Initialize design variables."""
                
         if not self.environment_config['randomize']:
             random.seed(100) #Keep same seed every episode environment should not be randomized
         
-        # Randomize initial values
-        for index, variable_type in enumerate(self.observation_variables):
+        for index, variable_type in enumerate(self.observation_variables):         # Randomize initial values
             variable_upper_limit = self.variable_config[variable_type]['upper']
             variable_lower_limit = self.variable_config[variable_type]['lower']
             
@@ -214,68 +185,96 @@ class SolventXEnv(gym.Env):
                 raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
             self.update_design_variable(variable_type,random_variable_value)
         
-        #try: #Solve design and check for convergence
-        self.sx_design.evaluate_loop(x=self.sx_design.x)
-        print('Solvent extraction design evaluation converged - initialization succeeded!')
-        #except:
-            #print('Solvent extraction design evaluation failed -  initialization failed!')
-        
+        self.sx_design.evaluate_open(x=self.sx_design.design_variables)        
+        self.logger.debug('Solvent extraction design evaluation converged - initialization succeeded!')        
     
     def get_metrics(self):
         """Extract and return metrics for each element."""
         
+        """
+        module_list = []
+        for module,element_list in self.sx_design.target_rees.items():
+            if len(element_list)==1:
+                for element in self.sx_design.confDict['modules']['output']['strip']: #Extract value for each element
+                    if element_list[0]==element:
+                        module_list.append(module)
+        print(f'Target modules:{module_list}')
+        """
+        recovery = {key:value for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
+        purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
+        
         metrics = {}
-        for metric in self.reward_config['metrics']: #Extract value for each metric
+        for metric in self.environment_config['goals']: #Extract value for each metric
             metrics.update({metric:{}})
-            for element in self.sx_design.confDict['modules']['output']['strip']: #Extract value for each element
-                if metric == 'recovery':
-                    metric_value = self.sx_design.recovery[element] #Recovery  self.sx_design.recovery['Strip-0'][self.obj.ree.index(element)] #Recovery
-                    metrics[metric].update({element:metric_value})
-                elif metric == 'purity':
-                    metric_value = self.sx_design.purity[element] #Purity self.sx_design.purity['Strip-0'][self.obj.ree.index(element)]
-                    metrics[metric].update({element:metric_value})
-                elif metric == 'profit':
-                    metric_value = self.sx_design.profit[element] #Profit
-                    metrics[metric].update({element:metric_value})
-                
-                else:
-                    raise ValueError(f'{metric} is an invalid metric!')
-               
-        return metrics #{'recovery':{'Nd':0.1,'Pr':0.1},'profit':{'Nd':0.1,'Pr':0.1}}
+            if metric == 'recovery':
+                for group in recovery:
+                    metric_value = recovery[group] #Recovery  
+                    metrics[metric].update({group:metric_value})
+            if metric == 'purity':
+                for group in purity:
+                    metric_value = purity[group] #Recovery
+                    metrics[metric].update({group:metric_value})
+                   
+        
+        return metrics #{'recovery':{'Strip-1':[0.1]}}
     
     def get_reward(self):
         """Calculate and return reward."""
         
         rewards = []
         metric_sum = 0.0
-        metric_dict = self.get_metrics() #{'recovery':{'Nd':0.1,'Pr':0.1},'profit':{'Nd':0.1,'Pr':0.1}}
+        metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
         
         for goal in self.environment_config['goals']:
             if goal not in self.reward_config['metrics']:
                 raise ValueError(f'{goal} is not found in reward config!')
             
-            metric_type= metric_dict[goal] #{'Nd':0.1,'Pr':0.1}}
-                
-            for element,metric in metric_type.items():
-                for _,metric_config in self.reward_config['metrics'][goal].items():
+            metric_type= metric_dict[goal] #{'Strip-1':[0.1]}
+            
+            for stage,metric in metric_type.items():
+                for level,metric_config in self.reward_config['metrics'][goal].items():
+                    min_level = next(iter(self.reward_config['metrics'][goal]))
+                    min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
                     if 'threshold' in metric_config:
-                        if metric < metric_config['threshold']: #Check if metric below threshold
+                        
+                        if isinstance(metric,list):
+                            if len(metric) > 1:
+                                raise ValueError(f'{stage} has more than 2 elements')
+                            else:
+                                metric = metric[0]
+                        
+                        if metric >= metric_config['threshold']: #Check if metric above threshold
+                            threshold_level = level
                             metric_reward = metric_config['reward']
-                        else:
-                            metric_reward = self.reward_config['metrics'][goal]['max']['reward'] #Assign maximum value if above threshold
-                if isinstance(metric_config['reward'],(int,float)):
-                    metric_reward = metric_config['reward']
-                elif isinstance(metric_config['reward'],str):
-                    metric_reward = eval(metric_config['reward'])
+                            
+                        if metric < min_threshold:
+                            threshold_level = 'min'
+                            metric_reward = self.reward_config['min'] #Assign maximum value if above threshold
+                            
+                if isinstance(metric_reward,(int,float)):
+                    metric_reward = metric_reward
+                elif isinstance(metric_reward,str):
+                    metric_reward = eval(metric_reward)
                 else:
-                    raise(f'{metric_config["reward"]} is an invalid reward for element:{element}!')    
-                
+                    raise(f'{metric_config["reward"]} is an invalid reward for stage:{stage}!')    
+                self.logger.debug(f'Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}')
                 metric_sum = metric_sum +  metric_reward #Sum reward for each element
             
             rewards.append(metric_sum) #Append reward for each goal -[0.4,0.9]
             
         return sum(rewards) #Sum rewards for all goals
     
+    def check_reward_config(self):
+        """Check reward dictionary."""
+        
+        for goal in self.environment_config['goals']:
+            min_level = next(iter(self.reward_config['metrics'][goal]))
+            min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
+            print(f'Minimum threshold {min_level} for {goal} is:{min_threshold}')
+            
+            for _,metric_config in self.reward_config['metrics'][goal].items():
+                if min_threshold > metric_config['threshold']:
+                    raise ValueError('Threshold for {goal}:{metric_config["threshold"]} should be greater than minimum threshold:{min_threshold}')
     
     def render(self, mode='human', create_graph_every=False):
         '''

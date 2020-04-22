@@ -1,21 +1,21 @@
 {
 "variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
-                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"log" }, 
-                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"log"  }, 
-                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"log"  }, 
+                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH" }, 
+                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH"  }, 
+                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH"  }, 
                     "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear"  }, 
-                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"linear"  }, 
-                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"linear"  }, 
-                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"linear"  }
+                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"  }, 
+                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"  }, 
+                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete"  }
                    },
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
 "environment_config":{"randomize":true,"goals":["recovery","purity"],
-                      "increment_actions_per_variable":2,"decrement_actions_per_variable":1,
+                      "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
                       "max_episode_steps":500},
 "logging_config":{"verbosity":"INFO"},
 "reward_config":{"discrete_reward":false,"min":-1.0,

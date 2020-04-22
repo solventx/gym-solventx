@@ -15,5 +15,14 @@ config_file = "C:\\Users\\splathottam\\Box Sync\\GitHub\\gym-solventx\\environme
 
 env = gym.make('gym_solventx-v0', config_file=config_file)
 observation = env.reset()
+print(f'Initial Observation:{observation}\nReward:{env.reward},')
 
-print(f'Observation:{observation}\nReward:{env.reward},')
+print(f'Executing one step:')
+action = env.action_space.sample() 
+observation, reward, done,_ = env.step(action)
+
+print(f'Action:{action}\nObservation:{observation}\nReward:{reward}\nDone:{done}')
+env.decipher_action(action)
+#print(env.action_dict)
+
+    

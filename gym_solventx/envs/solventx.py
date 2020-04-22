@@ -46,13 +46,8 @@ class SolventXEnv(gym.Env):
         self.reward_config = config_dict['reward_config']
         self.logscale = config_dict['logscale']
         
-        self.check_reward_config()        
-        
-        self.action_dict = utilities.create_action_dict(self.variable_config,self.environment_config)
-        self.observation_variables = utilities.create_variables_list(self.variable_config,self.environment_config)       
-        
-        self.action_space      = spaces.Discrete(len(self.action_dict))
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)        
+        self.setup_simulation()
+        self.setup_environment()                
        
     @property
     def envstate(self):
@@ -60,7 +55,26 @@ class SolventXEnv(gym.Env):
         
         return {self.observation_variables[i]: self.sx_design.x[i] for i in range(len(self.observation_variables))} 
     
+    def setup_simulation(self):
+        """Setup solvenx process simulation."""
+        
+        self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
+        self.sx_design.get_process() #Get initial values of variables and inputs
+        self.strip_groups = self.get_strip_groups()
+        self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
+        self.logger.debug(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
     
+    def setup_environment(self):
+        """Setup solvenx learning environment."""
+        
+        self.check_reward_config()        
+        
+        self.action_dict = utilities.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+        self.observation_variables = utilities.create_variables_list(self.variable_config,self.environment_config)       
+        
+        self.action_space      = spaces.Discrete(len(self.action_dict))
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)
+         
     def step(self, action): #return observation, reward, done, info
         
         if not self.done: #Only perform step if episode has not ended
@@ -68,31 +82,25 @@ class SolventXEnv(gym.Env):
             self.steps += 1
           
             if self.action_dict[action]: #Check if action exists
-                prev_state = self.sx_design.variables.copy()   #save previous state
+                prev_state = self.sx_design.x.copy()   #save previous state
                 self.perform_action(action) #map action to variable and action type
                 
-                try: #Solve design and check for convergence
-                    self.sx_design.evaluate_open(x=self.sx_design.variables)
-                    self.check_design_convergence()
-                    
-                    if not self.convergence_failure:
-                        self.reward = self.get_reward()
-
-                except:
-                    print('Solvent extraction design evaluation Failed - Terminating environment!')
-                    self.convergence_failure = True
-                    
-                if self.convergence_failure:
+                self.run_simulation()
+                
+                if not self.convergence_failure: #Calculate reward if there is no convergence failure
+                    self.reward = self.get_reward()                    
+                else: #Replace with previous state if there is convergence failure
                     self.sx_design.x = prev_state
                     self.done   = True
                     self.reward = -100
-                if self.steps >= self.max_episode_steps:
+                
+                if self.steps >= self.max_episode_steps: #Check if max episode steps reached
                     self.done = True
         
             else:
                 print(f'No action found in:{self.action_dict[action]}')
         
-        elif self.done:
+        else:
             if self.convergence_failure:
                 print(f'Convergence failure after {self.steps} - Reset environment to start new simulation!')
             else:
@@ -100,21 +108,40 @@ class SolventXEnv(gym.Env):
         
         return self.sx_design.x, self.reward, self.done, {}
 
+    
+    def run_simulation(self):
+        """Perform action"""
+    
+        try: #Solve design and check for convergence
+            self.sx_design.evaluate_open(x=self.sx_design.variables)
+            self.check_design_convergence()
+         
+        except:
+            print(f'Solvent extraction design evaluation Failed at step:{self.steps} - Terminating environment!')
+            self.convergence_failure = True
+    
     def check_design_convergence(self):
         """Perform action"""
         
         if not all(self.sx_design.status.values):
-            #raise ValueError('Equilibrium Failed! Invalid State Reached - Terminating environment!')
             print('Equilibrium Failed! Invalid State Reached - Terminating environment!')
             self.convergence_failure = True    
     
     def perform_action(self,action):
         """Perform action"""
         
-        variable_type = list(self.action_dict[action].keys())[0] #From Python 3.6,dict maintains insertion order by default.
-        variable_delta = self.action_dict[action][variable_type]
+        #variable_type = list(self.action_dict[action].keys())[0] #From Python 3.6,dict maintains insertion order by default.
         
-        self.update_design_variable(variable_type,variable_delta)
+        variable_type = self.action_dict[action]['type'] #Get variable type        
+        variable_index = self.action_dict[action]['index'] #Get variable index   
+        variable_delta = self.action_dict[action]['delta'] #Get variable delta
+        
+        self.update_design_variable(variable_type,variable_index,variable_delta)
+    
+    def decipher_action(self,action):
+        """Perform action"""
+        
+        print(f'Action {action} corresponds to {self.action_dict[action]}')    
     
     def get_design_variable(self,x_types):
         """Update design variable."""
@@ -123,16 +150,9 @@ class SolventXEnv(gym.Env):
         
         return [list(self.observation_variables)[i] for i in x_indexes]
     
-    def update_design_variable(self,x_type,delta_x):
-        """Update design variable."""
+          
         
-        x_upper_limit = self.variable_config[x_type]['upper']
-        x_lower_limit = self.variable_config[x_type]['lower']
-        x_index = list(self.observation_variables).index(x_type)  #Get variable index
-        new_x_value = self.sx_design.design_variables[x_index] + delta_x
-        
-        self.sx_design.design_variables[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
-        
+    
     def reset(self):
         """Reset environment."""
         
@@ -143,19 +163,53 @@ class SolventXEnv(gym.Env):
         self.invalid           = False
         
         self.max_episode_steps = min(self.environment_config['max_episode_steps'],self.spec.max_episode_steps)
+        self.reset_simulation()
+        
         self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
-        self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
-        self.sx_design.get_process() #Get initial values of variables and inputs
-        self.strip_groups = self.get_strip_groups()
-        self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
-        self.logger.debug(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
-        self.initialize_design_variables()
-        self.sx_design.evaluate_open(self.sx_design.design_variables) # 
                 
         self.reward      = self.get_reward()
         self.best_reward = self.reward
 
         return self.sx_design.x
+   
+    def reset_simulation(self):
+        """Initialize design variables."""
+               
+        if not self.environment_config['randomize']:
+            random.seed(100) #Keep same seed every episode environment should not be randomized
+        
+        for variable,index in self.sx_design.combined_var_space.items():
+            variable_type = variable.strip('-012') 
+            variable_upper_limit = self.variable_config[variable_type]['upper']
+            variable_lower_limit = self.variable_config[variable_type]['lower']
+            
+            if self.variable_config[variable_type]['scale']  == 'linear':
+                random_variable_value = round(random.uniform(variable_lower_limit, variable_upper_limit),3)                
+            elif self.variable_config[variable_type]['scale']  == 'discrete':
+                random_variable_value = random.randint(variable_lower_limit, variable_upper_limit)                            
+            elif self.variable_config[variable_type]['scale']  == 'log':
+                random_variable_value = random.choice(self.logscale)                
+            elif self.variable_config[variable_type]['scale']  == 'pH':
+                random_variable_value = random.choice(self.logscale)  
+            else:
+                raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
+            
+            self.update_design_variable(variable_type,index,random_variable_value)
+        
+        self.sx_design.evaluate_open(x=self.sx_design.design_variables)        
+        self.logger.debug('Solvent extraction design evaluation converged - initialization succeeded!')        
+
+    def update_design_variable(self,x_type,x_index,x_delta):
+        """Update design variable."""
+        
+        x_upper_limit = self.variable_config[x_type]['upper']
+        x_lower_limit = self.variable_config[x_type]['lower']
+        #x_index = list(self.observation_variables).index(x_type)  #Get variable index
+        new_x_value = self.sx_design.design_variables[x_index] + x_delta
+        
+        print(f'Updating variable {x_type} (index:{x_index}) by {x_delta:0.2f} to get {new_x_value:0.2f}')
+        
+        self.sx_design.design_variables[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
    
     def get_strip_groups(self):
         """Initialize design variables."""
@@ -167,26 +221,7 @@ class SolventXEnv(gym.Env):
         
         return strip_groups
     
-    def initialize_design_variables(self):
-        """Initialize design variables."""
-               
-        if not self.environment_config['randomize']:
-            random.seed(100) #Keep same seed every episode environment should not be randomized
-        
-        for index, variable_type in enumerate(self.observation_variables):         # Randomize initial values
-            variable_upper_limit = self.variable_config[variable_type]['upper']
-            variable_lower_limit = self.variable_config[variable_type]['lower']
-            
-            if self.variable_config[variable_type]['scale']  == 'linear':
-                random_variable_value = round(random.uniform(variable_lower_limit, variable_upper_limit),3)                
-            elif self.variable_config[variable_type]['scale']  == 'log':
-                random_variable_value = random.choice(self.logscale)                
-            else:
-                raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
-            self.update_design_variable(variable_type,random_variable_value)
-        
-        self.sx_design.evaluate_open(x=self.sx_design.design_variables)        
-        self.logger.debug('Solvent extraction design evaluation converged - initialization succeeded!')        
+    
     
     def get_metrics(self):
         """Extract and return metrics for each element."""

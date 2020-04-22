@@ -53,33 +53,65 @@ def get_config_dict(config_file):
     return config_dict    
 
 
-def create_action_dict(variable_config,environment_config):
+def create_action_dict(combined_var_space,variable_config,environment_config):
     """Create a dictionary of discrete actions."""
     """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
     
-    action_dict = {}
+    omitted_variables = ['mol_frac-Nd','mol_frac-Pr','mol_frac-Ce','mol_frac-La']
+    for variable in omitted_variables:
+        if variable in combined_var_space:
+            del combined_var_space[variable]
+    
+    #action_variables = [j.strip('-012') for j in combined_var_space.keys()] #Remove module numbers from variables list
     n_increment_actions = environment_config['increment_actions_per_variable']
     n_decrement_actions = environment_config['decrement_actions_per_variable']
     
-    direction = 1
+    total_increment_actions = n_increment_actions*len(combined_var_space) 
+    total_decrement_actions = n_decrement_actions*len(combined_var_space)
+    
+    print(f'Following action variables were found:{[j.strip("-012") for j in combined_var_space.keys()]}')
+    print(f'Total increment actions:{total_increment_actions},Total decrement actions:{total_decrement_actions}')
+    
+    action_dict = {}
+    action_dict.update({0:{}})    
     i = 1
-    for key in variable_config.keys():
+    
+    for variable,index in combined_var_space.items():
         if n_increment_actions>0:
             for j in range(1,n_increment_actions+1):
-                if variable_config[key]['scale'] is 'linear':
-                    action_dict[i][key] = j*variable_config[key]['delta']
-                elif variable_config[key]['scale'] is 'log':
-                    action_dict[i][key] = 10**(j*variable_config[key]['delta']) #Convert log to actual number
+                action_variable = variable.strip('-012') 
+                if variable_config[action_variable]['scale'] == 'linear':
+                    delta_value = j*variable_config[action_variable]['delta']
+                elif variable_config[action_variable]['scale'] == 'discrete':
+                    delta_value = int(j*variable_config[action_variable]['delta'])                
+                elif variable_config[action_variable]['scale'] == 'log':
+                    delta_value = 10**(j*variable_config[action_variable]['delta']) #Convert log to actual number
+                elif variable_config[action_variable]['scale'] == 'pH':
+                    delta_value = 10**(-j*variable_config[action_variable]['delta']) #Convert pH to actual number
+                
+                else:
+                    raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in increment action!')
+                
+                action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
+                print(f'Converted incriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')
                 i = i+1
+                
         if n_decrement_actions>0:
             for k in range(1,n_decrement_actions+1):
-                if variable_config[key]['scale'] is 'linear':
-                    action_dict[i][key] = k*variable_config[key]['delta']
-                elif variable_config[key]['scale'] is 'log':
-                    action_dict[i][key] = -10**(k*variable_config[key]['delta']) #Convert log to actual number
+                if variable_config[action_variable]['scale'] == 'linear':
+                    delta_value = -k*variable_config[action_variable]['delta']
+                elif variable_config[action_variable]['scale'] == 'discrete':
+                    delta_value = int(k*variable_config[action_variable]['delta'])        
+                elif variable_config[action_variable]['scale'] == 'log':
+                    delta_value = -10**(k*variable_config[action_variable]['delta']) #Convert log to actual number
+                elif variable_config[action_variable]['scale'] == 'pH':
+                    delta_value = -10**(-k*variable_config[action_variable]['delta']) #Convert pH to actual number                
+                else:
+                    raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in decrement action!')                
+                action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
+                print(f'Converted decriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')                
                 i = i+1
-
-    action_dict.update({0:{}})
+    
     return action_dict
 
 def create_variables_list(variable_config,environment_config):

@@ -7,7 +7,7 @@ Created on Thu Apr 16 12:46:30 2020
 
 from solventx import solventx as sx
 
-config_file = "C:\\Users\\splathottam\\Box Sync\\GitHub\solventx\\design.json"
+config_file = "C:/Users/splathottam/Box Sync/GitHub/solventx/design.json"
 
 sx_design = sx.solventx(config_file) #instantiate solvent extraction object 
 

@@ -11,7 +11,7 @@ import gym
 import gym_solventx 
 import os
 
-config_file = "..\\environment_design_config.json"
+config_file = "../environment_design_config.json"
 
 env = gym.make('gym_solventx-v0', config_file=config_file)
 observation = env.reset()

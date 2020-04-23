@@ -256,7 +256,8 @@ class SolventXEnv(gym.Env):
         """Calculate and return reward."""
         
         rewards = []
-        metric_sum = 0.0
+        reward_stage = 0.0
+        reward_sum = 0.0
         metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
         
         for goal in self.environment_config['goals']:
@@ -264,8 +265,9 @@ class SolventXEnv(gym.Env):
                 raise ValueError(f'{goal} is not found in reward config!')
             #print('Metric dict:',metric_dict)
             metric_type= metric_dict[goal] #{'Strip-1':{'metric_value':[0.1],'elements':['Nd']}}
-            
-            for stage,stage_dict in metric_type.items():
+            reward_stage = 0.0 #Reset sum of stages for each goal
+            for stage,stage_dict in metric_type.items():                
+                metric_reward = 0.0
                 for level,metric_config in self.reward_config['metrics'][goal].items():
                     min_level = next(iter(self.reward_config['metrics'][goal]))
                     min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
@@ -298,10 +300,10 @@ class SolventXEnv(gym.Env):
                 #self.logger.debug(f'Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}')
                 print(f'Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}')
                 
-                metric_sum = metric_sum +  metric_reward #Sum reward for each element
-            
-            rewards.append(metric_sum) #Append reward for each goal -[0.4,0.9]
-            
+                reward_stage = reward_stage +  metric_reward #Sum reward for each stage
+                
+            rewards.append(reward_stage) #Append reward for each goal -[0.4,0.9]
+        #print(rewards)    
         return sum(rewards) #Sum rewards for all goals
     
     def decipher_action(self,action):

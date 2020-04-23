@@ -101,7 +101,7 @@ def create_action_dict(combined_var_space,variable_config,environment_config):
                 if variable_config[action_variable]['scale'] == 'linear':
                     delta_value = -k*variable_config[action_variable]['delta']
                 elif variable_config[action_variable]['scale'] == 'discrete':
-                    delta_value = int(k*variable_config[action_variable]['delta'])        
+                    delta_value = int(-k*variable_config[action_variable]['delta'])        
                 elif variable_config[action_variable]['scale'] == 'log':
                     delta_value = -10**(k*variable_config[action_variable]['delta']) #Convert log to actual number
                 elif variable_config[action_variable]['scale'] == 'pH':

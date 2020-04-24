@@ -1,8 +1,8 @@
 {
 "variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
-                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH" }, 
-                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH"  }, 
-                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":0.5, "scale":"pH"  }, 
+                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH" }, 
+                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH"  }, 
+                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH"  }, 
                     "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
@@ -14,19 +14,23 @@
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
-"environment_config":{"randomize":true,"goals":["recovery","purity"],
+"environment_config":{"randomize":true,"goals":["recovery","purity","recority"],
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
                       "max_episode_steps":500},
 "logging_config":{"verbosity":"INFO"},
 "reward_config":{"discrete_reward":false,"min":-1.0,
-                 "metrics":{"recovery":{"0":{"threshold":0.5,"reward":0.0},
+                 "metrics":{"recovery":{"0":{"threshold":0.4,"reward":0.0},
                                         "1":{"threshold":0.6,"reward":"abs(1-metric)"},
                                         "2":{"threshold":0.85,"reward":"metric"}
                                        }, 
                            "purity":{"0":{"threshold":0.9,"reward":0.0},
                                     "1":{"threshold":0.985,"reward":"abs(1-metric)"},
                                     "2":{"threshold":0.995,"reward":"metric"}
-                                   }                                   
+                                   },
+                         "recority":{"0":{"threshold":0.4,"reward":0.0},
+                                    "1":{"threshold":0.6,"reward":"abs(1-metric)"},
+                                    "2":{"threshold":0.9,"reward":"metric"}
+                                   }                                         
                          }
                 }
 }

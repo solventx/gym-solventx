@@ -114,13 +114,12 @@ def create_action_dict(combined_var_space,variable_config,environment_config):
     
     return action_dict
 
-def create_variables_list(variable_config,environment_config):
+def create_variables_list(combined_var_space):
     """Create a list of all design variables in every stage."""
     
-    observation_variables = variable_config.keys()
+    observation_variables = list(combined_var_space.keys())
     
     return observation_variables
-    
     
 #rounds number to the nearest value `nearest`
 #`nearest` must be between 0-1

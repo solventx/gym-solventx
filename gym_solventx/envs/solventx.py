@@ -10,9 +10,7 @@ from   gym       import error, spaces, utils
 
 import matplotlib.pyplot as plt
 from solventx import solventx
-from gym_solventx.envs import utilities#,config
-
-#from solventx.methods import solvent_sweep
+from gym_solventx.envs import utilities
 
 class SolventXEnv(gym.Env):
     """SolventX environment."""
@@ -72,7 +70,7 @@ class SolventXEnv(gym.Env):
         self.check_reward_config()        
         
         self.action_dict = utilities.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
-        self.observation_variables = utilities.create_variables_list(self.variable_config,self.environment_config)       
+        self.observation_variables = utilities.create_variables_list(self.sx_design.combined_var_space)       
         
         self.action_space      = spaces.Discrete(len(self.action_dict))
         self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)
@@ -116,14 +114,14 @@ class SolventXEnv(gym.Env):
         
         """
         try: #Solve design and check for convergence
-            self.sx_design.evaluate_open(x=self.sx_design.design_variables)
+            self.sx_design.evaluate_open(x=self.sx_design.x)
             self.check_design_convergence()
          
         except:
             print(f'Solvent extraction design evaluation Failed at step:{self.steps} - Terminating environment!')
             self.convergence_failure = True
         """
-        self.sx_design.evaluate_open(x=self.sx_design.design_variables)      
+        self.sx_design.evaluate_open(x=self.sx_design.x)      
         self.check_design_convergence()
     
     def check_design_convergence(self):
@@ -147,7 +145,7 @@ class SolventXEnv(gym.Env):
         variable_index = self.action_dict[action]['index'] #Get variable index   
         variable_delta = self.action_dict[action]['delta'] #Get variable delta
         
-        new_variable_value  = self.sx_design.design_variables[variable_index] + variable_delta 
+        new_variable_value  = self.sx_design.x[variable_index] + variable_delta 
         
         self.update_design_variable(variable_type,variable_index,new_variable_value)
     
@@ -193,10 +191,16 @@ class SolventXEnv(gym.Env):
             else:
                 raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
             
+            if variable_type== "H+ Extraction":
+                random_variable_value = self.variable_config[variable_type]['lower']
+            if variable_type== "H+ Scrub":
+                random_variable_value = self.variable_config[variable_type]['lower']            
+            if variable_type== "H+ Strip":
+                random_variable_value = self.variable_config[variable_type]['upper']            
+                
             self.update_design_variable(variable_type,index,random_variable_value)
         
         self.run_simulation()
-        #self.sx_design.evaluate_open(x=self.sx_design.design_variables)        
         self.logger.debug('Solvent extraction design evaluation converged - initialization succeeded!')        
 
     def update_design_variable(self,x_type,x_index,new_x_value):
@@ -205,12 +209,11 @@ class SolventXEnv(gym.Env):
         x_upper_limit = self.variable_config[x_type]['upper']
         x_lower_limit = self.variable_config[x_type]['lower']
         
-        #new_x_value = self.sx_design.design_variables[x_index] + x_delta
-        x_delta = new_x_value - self.sx_design.design_variables[x_index]
+        x_delta = new_x_value - self.sx_design.x[x_index]
         
-        print(f'Updating variable {x_type} (index:{x_index},current value:{self.sx_design.design_variables[x_index]:0.2f}) by {x_delta:0.2f} to get {new_x_value:0.2f}')
+        print(f'Updating variable {x_type} (index:{x_index},current value:{self.sx_design.x[x_index]:0.4f}) by {x_delta:0.4f} to {new_x_value:0.4f} (min:{x_lower_limit},max:{x_upper_limit})')
         
-        self.sx_design.design_variables[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
+        self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
    
     def get_strip_groups(self):
         """Initialize design variables."""
@@ -239,7 +242,8 @@ class SolventXEnv(gym.Env):
         strip_elements = {key:value for key, value in self.sx_design.target_rees.items() if key.startswith("Strip")}
         
         metrics = {}
-        for metric_type in self.environment_config['goals']: #Extract value for each metric
+        
+        for metric_type in self.reward_config['metrics']: #Extract value for each metric
             metrics.update({metric_type:{}})
             if metric_type == 'recovery':
                 for group in recovery:
@@ -249,15 +253,19 @@ class SolventXEnv(gym.Env):
                 for group in purity:
                     metric_value = purity[group] #Purity
                     metrics[metric_type].update({group:{'metric_value':metric_value}})                   
-        
+            if metric_type == 'recority':
+                for group in recovery:
+                    metric_value = recovery[group][0] * purity[group] #Recovery*Purity
+                    metrics[metric_type].update({group:{'metric_value':metric_value}})    
+                    print(f'Converted recovery {recovery[group][0]:.2f} and purity {purity[group]:.2f} from {group} into recority!')
+                    
         return metrics #{'recovery':{'Strip-1':{'metric_value':[0.1],'elements':['Nd','Pr']}}}
     
     def get_reward(self):
         """Calculate and return reward."""
         
         rewards = []
-        reward_stage = 0.0
-        reward_sum = 0.0
+        reward_stage = 0.0       
         metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
         
         for goal in self.environment_config['goals']:
@@ -274,9 +282,6 @@ class SolventXEnv(gym.Env):
                     if 'threshold' in metric_config:
                         
                         if isinstance(stage_dict['metric_value'],list):
-                            #if len(stage_dict['metric_value']) > 1:
-                                #raise ValueError(f'{stage} has more than 2 elements')
-                            #else:
                             metric = stage_dict['metric_value'][0]
                         elif isinstance(stage_dict['metric_value'],(float,int)):
                             metric = stage_dict['metric_value']
@@ -309,15 +314,8 @@ class SolventXEnv(gym.Env):
     def decipher_action(self,action):
         """Perform action"""
         
-        print(f'Action {action} corresponds to {self.action_dict[action]}')    
-    
-    def get_design_variable(self,x_types):
-        """Update design variable."""
-        
-        x_indexes = [list(self.observation_variables).index(x_type) for x_type in x_types]
-        
-        return [list(self.observation_variables)[i] for i in x_indexes]
-    
+        print(f'Action {action} corresponds to {self.action_dict[action]}')        
+   
     def check_reward_config(self):
         """Check reward dictionary."""
         

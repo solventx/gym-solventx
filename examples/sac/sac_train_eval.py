@@ -22,11 +22,9 @@ https://arxiv.org/pdf/1812.05905.pdf
 To run:
 
 ```bash
-tensorboard --logdir $HOME/tmp/sac/gym/HalfCheetah-v2/ --port 2223 &
+tensorboard --logdir $HOME/tmp/sac/gym/gym_solventx-v0/ --port 2223 &
 
-python tf_agents/agents/sac/examples/v2/train_eval.py \
-  --root_dir=$HOME/tmp/sac/gym/HalfCheetah-v2/ \
-  --alsologtostderr
+python sac_train_eval.py --root_dir=$HOME/tmp/sac/gym/gym_solventx-v0/ --alsologtostderr
 ```
 """
 
@@ -43,13 +41,15 @@ from absl import logging
 
 import gin
 from six.moves import range
+import gym
+import gym_solventx 
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
 
 from tf_agents.agents.ddpg import critic_network
 from tf_agents.agents.sac import sac_agent
 from tf_agents.agents.sac import tanh_normal_projection_network
 from tf_agents.drivers import dynamic_step_driver
-from tf_agents.environments import suite_mujoco
+from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
 from tf_agents.eval import metric_utils
 from tf_agents.metrics import tf_metrics
@@ -66,14 +66,15 @@ flags.DEFINE_multi_string('gin_file', None, 'Path to the trainer config files.')
 flags.DEFINE_multi_string('gin_param', None, 'Gin binding to pass through.')
 
 FLAGS = flags.FLAGS
+config_file = "/home/splathottam/GitHub/gym-solventx/environment_design_config.json"
 
 
 @gin.configurable
 def train_eval(
     root_dir,
-    env_name='HalfCheetah-v2',
+    env_name='gym_solventx-v0',
     eval_env_name=None,
-    env_load_fn=suite_mujoco.load,
+    env_load_fn=suite_gym.load,
     # The SAC paper reported:
     # Hopper and Cartpole results up to 1000000 iters,
     # Humanoid results up to 10000000 iters,
@@ -109,13 +110,13 @@ def train_eval(
     num_eval_episodes=30,
     eval_interval=10000,
     # Params for summaries and logging
-    train_checkpoint_interval=10000,
-    policy_checkpoint_interval=5000,
-    rb_checkpoint_interval=50000,
+    train_checkpoint_interval=5000,
+    policy_checkpoint_interval=2500,
+    rb_checkpoint_interval=25000,
     log_interval=1000,
     summary_interval=1000,
     summaries_flush_secs=10,
-    debug_summaries=False,
+    debug_summaries=True,
     summarize_grads_and_vars=False,
     eval_metrics_callback=None):
   """A simple train and eval for SAC."""
@@ -137,9 +138,16 @@ def train_eval(
   global_step = tf.compat.v1.train.get_or_create_global_step()
   with tf.compat.v2.summary.record_if(
       lambda: tf.math.equal(global_step % summary_interval, 0)):
-    tf_env = tf_py_environment.TFPyEnvironment(env_load_fn(env_name))
     eval_env_name = eval_env_name or env_name
-    eval_tf_env = tf_py_environment.TFPyEnvironment(env_load_fn(eval_env_name))
+    gym_env = gym.make(env_name, config_file=config_file)
+    py_env = suite_gym.wrap_env(gym_env,max_episode_steps=100)
+    tf_env = tf_py_environment.TFPyEnvironment(py_env)
+    eval_gym_env = gym.make(eval_env_name, config_file=config_file)
+    eval_py_env = suite_gym.wrap_env(eval_gym_env,max_episode_steps=100)
+    eval_tf_env = tf_py_environment.TFPyEnvironment(eval_py_env)    
+    
+    #tf_env = tf_py_environment.TFPyEnvironment(env_load_fn(env_name))    
+    #eval_tf_env = tf_py_environment.TFPyEnvironment(env_load_fn(eval_env_name))
 
     time_step_spec = tf_env.time_step_spec()
     observation_spec = time_step_spec.observation

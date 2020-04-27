@@ -32,12 +32,13 @@ class SolventXEnv(gym.Env):
         
         SolventXEnv.count = SolventXEnv.count+1 #Increment count to keep track of number of converter model instances
         
-        self.name              ='gym_solventx-v0'
+        self.name              ='gym_solventx-v0_'+str(SolventXEnv.count)
         
         config_dict = utilities.get_config_dict(config_file) #Get configuration dictionary
         self.logger = utilities.get_logger(config_dict,self)
         self.logger.info('Creating process design environment!')        
         
+        self.verbosity = config_dict['logging_config']['verbosity']
         self.variable_config = config_dict['variable_config']
         self.process_config = config_dict['process_config']
         self.environment_config = config_dict['environment_config']
@@ -62,6 +63,16 @@ class SolventXEnv(gym.Env):
         self.strip_groups = self.get_strip_groups()
         self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
         self.logger.debug(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
+        
+        """
+        module_list = []
+        for module,element_list in self.sx_design.target_rees.items():
+            if len(element_list)==1:
+                for element in self.sx_design.confDict['modules']['output']['strip']: #Extract value for each element
+                    if element_list[0]==element:
+                        module_list.append(module)
+        print(f'Target modules:{module_list}')
+        """
     
     def setup_environment(self):
         """Setup solvenx learning environment."""
@@ -80,7 +91,8 @@ class SolventXEnv(gym.Env):
         if not self.done: #Only perform step if episode has not ended
             self.action_stats.update({action:self.action_stats[action]+1})
             self.steps += 1
-            print(f'Starting step:{self.steps}')
+            text_string = f'Starting step:{self.steps}'
+            self.print2terminal(text_string)
             if self.action_dict[action]: #Check if action exists
                 prev_state = self.sx_design.x.copy()   #save previous state
                 self.perform_action(action) #map action to variable and action type
@@ -134,12 +146,12 @@ class SolventXEnv(gym.Env):
         else:
             converged_modules = [stage for stage,converged in self.sx_design.status.items() if converged]
             assert len(converged_modules) == len(self.sx_design.status), 'All modules should converge'
-            print(f'Equilibrium succeeded at step:{self.steps} for all modules:{converged_modules}')        
+            
+            text_string  =f'{self.name}:Equilibrium succeeded at step:{self.steps} for all modules:{converged_modules}'
+            self.print2terminal(text_string)
     
     def perform_action(self,action):
         """Perform action"""
-        
-        #variable_type = list(self.action_dict[action].keys())[0] #From Python 3.6,dict maintains insertion order by default.
         
         variable_type = self.action_dict[action]['type'] #Get variable type        
         variable_index = self.action_dict[action]['index'] #Get variable index   
@@ -211,7 +223,12 @@ class SolventXEnv(gym.Env):
         
         x_delta = new_x_value - self.sx_design.x[x_index]
         
-        print(f'Updating variable {x_type} (index:{x_index},current value:{self.sx_design.x[x_index]:0.4f}) by {x_delta:0.4f} to {new_x_value:0.4f} (min:{x_lower_limit},max:{x_upper_limit})')
+        if x_delta>0.0:
+            change_direction = 'Increasing'
+        else:
+            change_direction = 'Decreasing'
+        
+        print(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
         
         self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
    
@@ -226,20 +243,11 @@ class SolventXEnv(gym.Env):
         return strip_groups
    
     def get_metrics(self):
-        """Extract and return metrics for each element."""
+        """Extract and return metrics for each element."""       
         
-        """
-        module_list = []
-        for module,element_list in self.sx_design.target_rees.items():
-            if len(element_list)==1:
-                for element in self.sx_design.confDict['modules']['output']['strip']: #Extract value for each element
-                    if element_list[0]==element:
-                        module_list.append(module)
-        print(f'Target modules:{module_list}')
-        """
         recovery = {key:value for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
         purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
-        strip_elements = {key:value for key, value in self.sx_design.target_rees.items() if key.startswith("Strip")}
+        #strip_elements = {key:value for key, value in self.sx_design.target_rees.items() if key.startswith("Strip")}
         
         metrics = {}
         
@@ -248,7 +256,7 @@ class SolventXEnv(gym.Env):
             if metric_type == 'recovery':
                 for group in recovery:
                     metric_value = recovery[group] #Recovery  
-                    metrics[metric_type].update({group:{'metric_value':metric_value,'elements':strip_elements[group]}})
+                    metrics[metric_type].update({group:{'metric_value':metric_value}}) #,'elements':strip_elements[group]
             if metric_type == 'purity':
                 for group in purity:
                     metric_value = purity[group] #Purity
@@ -257,8 +265,8 @@ class SolventXEnv(gym.Env):
                 for group in recovery:
                     metric_value = recovery[group][0] * purity[group] #Recovery*Purity
                     metrics[metric_type].update({group:{'metric_value':metric_value}})    
-                    print(f'Converted recovery {recovery[group][0]:.2f} and purity {purity[group]:.2f} from {group} into recority!')
-                    
+                    text_string =f'{self.name}:Converted recovery {recovery[group][0]:.3f} and purity {purity[group]:.3f} from {group} into recority {metric_value:.3f}!'
+                    self.print2terminal(text_string)
         return metrics #{'recovery':{'Strip-1':{'metric_value':[0.1],'elements':['Nd','Pr']}}}
     
     def get_reward(self):
@@ -302,19 +310,19 @@ class SolventXEnv(gym.Env):
                     metric_reward = eval(metric_reward)
                 else:
                     raise(f'{metric_config["reward"]} is an invalid reward for stage:{stage}!')    
-                #self.logger.debug(f'Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}')
-                print(f'Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}')
+                
+                text_string = f'{self.name}:Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}'
+                self.print2terminal(text_string)
                 
                 reward_stage = reward_stage +  metric_reward #Sum reward for each stage
                 
             rewards.append(reward_stage) #Append reward for each goal -[0.4,0.9]
-        #print(rewards)    
         return sum(rewards) #Sum rewards for all goals
     
     def decipher_action(self,action):
         """Perform action"""
         
-        print(f'Action {action} corresponds to {self.action_dict[action]}')        
+        print(f'{self.name}:Action {action} corresponds to {self.action_dict[action]}')        
    
     def check_reward_config(self):
         """Check reward dictionary."""
@@ -328,6 +336,16 @@ class SolventXEnv(gym.Env):
                 if min_threshold > metric_config['threshold']:
                     raise ValueError('Threshold for {goal}:{metric_config["threshold"]} should be greater than minimum threshold:{min_threshold}')
     
+    def print2terminal(self,text_string):
+        """Print information based on verbosity."""
+        
+        if self.verbosity == 'DEBUG':
+           print(text_string)        
+        elif self.verbosity == 'INFO':
+           pass
+        else:
+            raise ValueError(f'{self.verbosity} is an invalid verbosity keyword!')
+        
     def render(self, mode='human', create_graph_every=False):
         '''
         create_graph_every: steps per graph generation

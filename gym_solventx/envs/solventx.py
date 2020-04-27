@@ -72,8 +72,8 @@ class SolventXEnv(gym.Env):
         self.action_dict = utilities.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
         self.observation_variables = utilities.create_variables_list(self.sx_design.combined_var_space)       
         
-        self.action_space      = spaces.Discrete(len(self.action_dict))
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32)
+        self.action_space      = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32) #Necessary for environment to work
          
     def step(self, action): #return observation, reward, done, info
         

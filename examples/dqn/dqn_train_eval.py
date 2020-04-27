@@ -16,14 +16,12 @@
 # Lint as: python2, python3
 r"""Train and Eval DQN.
 
-To run DQN on solventx:
+To run DQN on gym-solventx:
 
 ```bash
-tensorboard --logdir $HOME/tmp/dqn/gym/solventx-v0/ --port 2223 &
+tensorboard --logdir $HOME/tmp/dqn/gym/gym_solventx-v0/ --port 2223 &
 
-python gym-solventx/examples/dqn/dqn_train_eval.py \
-  --root_dir=$HOME/tmp/dqn/gym/solventx-v0/ \
-  --alsologtostderr
+python dqn_train_eval.py --root_dir=$HOME/tmp/dqn/gym/gym_solventx-v0/ --alsologtostderr
 ```
 
 To run DQN-RNNs on solventx:
@@ -31,7 +29,7 @@ To run DQN-RNNs on solventx:
 ```bash
 tensorboard --logdir $HOME/tmp/dqn_rnn/gym/solventx-v0/ --port 2223
 python gym-solventx/examples/dqn/dqn_train_eval.py \
-  --root_dir=$HOME/tmp/dqn_rnn/gym/solventx-v0/ \
+  --root_dir=$HOME/tmp/dqn_rnn/gym/gym_solventx-v0/ \
   --gin_param='train_eval.train_sequence_length=10' \
   --alsologtostderr
 ```
@@ -51,6 +49,8 @@ from absl import logging
 
 import gin
 from six.moves import range
+import gym
+import gym_solventx 
 import tensorflow as tf  # pylint: disable=g-explicit-tensorflow-version-import
 
 from tf_agents.agents.dqn import dqn_agent
@@ -62,6 +62,7 @@ from tf_agents.metrics import tf_metrics
 from tf_agents.networks import q_network
 from tf_agents.networks import q_rnn_network
 from tf_agents.policies import random_tf_policy
+from tf_agents.policies import policy_saver
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.utils import common
 
@@ -73,7 +74,7 @@ flags.DEFINE_multi_string('gin_file', None, 'Paths to the gin-config files.')
 flags.DEFINE_multi_string('gin_param', None, 'Gin binding parameters.')
 
 FLAGS = flags.FLAGS
-
+config_file = "/home/splathottam/GitHub/gym-solventx/environment_design_config.json"
 
 @gin.configurable
 def train_eval(
@@ -123,6 +124,7 @@ def train_eval(
   root_dir = os.path.expanduser(root_dir)
   train_dir = os.path.join(root_dir, 'train')
   eval_dir = os.path.join(root_dir, 'eval')
+  saved_model_dir = os.path.join(root_dir, 'policy_saved_model')
 
   train_summary_writer = tf.compat.v2.summary.create_file_writer(
       train_dir, flush_millis=summaries_flush_secs * 1000)
@@ -138,8 +140,15 @@ def train_eval(
   global_step = tf.compat.v1.train.get_or_create_global_step()
   with tf.compat.v2.summary.record_if(
       lambda: tf.math.equal(global_step % summary_interval, 0)):
-    tf_env = tf_py_environment.TFPyEnvironment(suite_gym.load(env_name))
-    eval_tf_env = tf_py_environment.TFPyEnvironment(suite_gym.load(env_name))
+    gym_env = gym.make(env_name, config_file=config_file)
+    py_env = suite_gym.wrap_env(gym_env,max_episode_steps=100)
+    tf_env = tf_py_environment.TFPyEnvironment(py_env)
+    eval_gym_env = gym.make(env_name, config_file=config_file)
+    eval_py_env = suite_gym.wrap_env(eval_gym_env,max_episode_steps=100)
+    eval_tf_env = tf_py_environment.TFPyEnvironment(eval_py_env)    
+    
+    #tf_env = tf_py_environment.TFPyEnvironment(suite_gym.load(env_name))    
+    #eval_tf_env = tf_py_environment.TFPyEnvironment(suite_gym.load(env_name), config_file=config_file)
 
     if train_sequence_length != 1 and n_step_update != 1:
       raise NotImplementedError(
@@ -209,10 +218,13 @@ def train_eval(
         ckpt_dir=os.path.join(train_dir, 'policy'),
         policy=eval_policy,
         global_step=global_step)
+    saved_model = policy_saver.PolicySaver(
+        eval_policy, train_step=global_step)
     rb_checkpointer = common.Checkpointer(
         ckpt_dir=os.path.join(train_dir, 'replay_buffer'),
         max_to_keep=1,
         replay_buffer=replay_buffer)
+   
 
     train_checkpointer.initialize_or_restore()
     rb_checkpointer.initialize_or_restore()
@@ -297,6 +309,9 @@ def train_eval(
 
       if global_step.numpy() % policy_checkpoint_interval == 0:
         policy_checkpointer.save(global_step=global_step.numpy())
+        saved_model_path = os.path.join(
+              saved_model_dir, 'policy_' + ('%d' % global_step.numpy()).zfill(9))
+        saved_model.save(saved_model_path)
 
       if global_step.numpy() % rb_checkpoint_interval == 0:
         rb_checkpointer.save(global_step=global_step.numpy())

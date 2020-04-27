@@ -12,11 +12,11 @@
                     "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete"  }
                    },
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
+"process_config":{"design_config":"/home/splathottam/GitHub/solventx/design.json"},
     
-"environment_config":{"randomize":true,"goals":["recovery","purity","recority"],
+"environment_config":{"randomize":true,"goals":["recority"],
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
-                      "max_episode_steps":500},
+                      "max_episode_steps":100},
 "logging_config":{"verbosity":"INFO"},
 "reward_config":{"discrete_reward":false,"min":-1.0,
                  "metrics":{"recovery":{"0":{"threshold":0.4,"reward":0.0},
@@ -27,9 +27,11 @@
                                     "1":{"threshold":0.985,"reward":"abs(1-metric)"},
                                     "2":{"threshold":0.995,"reward":"metric"}
                                    },
-                         "recority":{"0":{"threshold":0.4,"reward":0.0},
-                                    "1":{"threshold":0.6,"reward":"abs(1-metric)"},
-                                    "2":{"threshold":0.9,"reward":"metric"}
+                         "recority":{"0":{"threshold":0.1,"reward":0.0},
+                                    "1":{"threshold":0.2,"reward":"metric/3"},
+                                    "2":{"threshold":0.4,"reward":"metric/2"},
+                                    "3":{"threshold":0.6,"reward":"metric"},
+                                    "4":{"threshold":0.9,"reward":1.0}
                                    }                                         
                          }
                 }

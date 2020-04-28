@@ -116,34 +116,33 @@ class SolventXEnv(gym.Env):
         
         else:
             if self.convergence_failure:
-                print(f'Convergence failure after {self.steps} - Reset environment to start new simulation!')
+                print(f'Convergence failure after {self.steps} steps - Reset environment to start new simulation!')
             else:
                 print(f'Episode completed after {self.steps} steps - Reset environment to start new simulation!')
         
         return self.sx_design.x, self.reward, self.done, {}
-
     
     def run_simulation(self):
-        """Perform action"""
+        """Perform action"""        
         
-        """
         try: #Solve design and check for convergence
             self.sx_design.evaluate_open(x=self.sx_design.x)
-            self.check_design_convergence()
-         
-        except:
-            print(f'Solvent extraction design evaluation Failed at step:{self.steps} - Terminating environment!')
+            
+        #except (RuntimeError, ValueError, EOFError,MemoryError,ZeroDivisionError):
+        except:    
+            print(f'{self.name}:Exception of type:{sys.exc_info()[0]} occured!')
+            print(f'{self.name}:Design evaluation Failed at step:{self.steps} - Terminating environment!')
             self.convergence_failure = True
-        """
-        self.sx_design.evaluate_open(x=self.sx_design.x)      
-        self.check_design_convergence()
+        
+        else: #Execute if no exception has occured
+            self.check_design_convergence() #Double check convergence in all stages
     
     def check_design_convergence(self):
         """Perform action"""
         
         if not all(self.sx_design.status.values()):
             failed_modules = [stage for stage,converged in self.sx_design.status.items() if not converged]
-            print(f'Equilibrium failed at step:{self.steps} due to non-convergence in following modules:{failed_modules} - Terminating environment!')
+            print(f'{self.name}:Equilibrium failed at step:{self.steps} due to non-convergence in following modules:{failed_modules} - Terminating environment!')
             self.convergence_failure = True    
         else:
             converged_modules = [stage for stage,converged in self.sx_design.status.items() if converged]

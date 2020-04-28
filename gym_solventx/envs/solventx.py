@@ -106,7 +106,7 @@ class SolventXEnv(gym.Env):
                 else: #Replace with previous state if there is convergence failure
                     self.sx_design.x = prev_state
                     self.done   = True
-                    self.reward = -100
+                    self.reward = self.reward_config['min'] #-100 #Assign minimum reward if convergence failure
                 
                 if self.steps >= self.max_episode_steps: #Check if max episode steps reached
                     self.done = True
@@ -286,7 +286,7 @@ class SolventXEnv(gym.Env):
             for stage,stage_dict in metric_type.items():                
                 metric_reward = 0.0
                 for level,metric_config in self.reward_config['metrics'][goal].items():
-                    min_level = next(iter(self.reward_config['metrics'][goal]))
+                    min_level = next(iter(self.reward_config['metrics'][goal])) #Get the key for the first threshold
                     min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
                     if 'threshold' in metric_config:
                         
@@ -303,7 +303,7 @@ class SolventXEnv(gym.Env):
                             
                         if metric < min_threshold:
                             threshold_level = 'min'
-                            metric_reward = self.reward_config['min'] #Assign maximum value if above threshold
+                            metric_reward = self.reward_config['min'] #Assign minumum value if below threshold
                             
                 if isinstance(metric_reward,(int,float)):
                     metric_reward = metric_reward

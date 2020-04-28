@@ -17,7 +17,7 @@ class SolventXEnv(gym.Env):
     
     count = 0
     
-    def __init__(self, config_file):
+    def __init__(self, config_file,identifier):
         """Creates an instance of `SolventXEnv`.
         
         Args:
@@ -32,7 +32,9 @@ class SolventXEnv(gym.Env):
         
         SolventXEnv.count = SolventXEnv.count+1 #Increment count to keep track of number of converter model instances
         
-        self.name              ='gym_solventx-v0_'+str(SolventXEnv.count)
+        if not identifier:
+           identifier = str(SolventXEnv.count)
+        self.name ='gym_solventx-v0_'+identifier
         
         config_dict = utilities.get_config_dict(config_file) #Get configuration dictionary
         self.logger = utilities.get_logger(config_dict,self)

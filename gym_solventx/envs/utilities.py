@@ -5,7 +5,123 @@ import math
 import json
 import logging
 
+from gym import logger
+
 from gym_solventx.envs import templates
+
+
+class SolventXEnvUtilities:
+    """SolventX environment."""
+
+    def get_config_dict(self,config_file):
+        """Read config file create confi dict."""
+        
+        assert 'json' in config_file, 'Config file must be a json file!'
+        config_keys = templates.config_keys
+        
+        design_config = read_config(config_file)
+        
+        config_dict = {}
+        for key in config_keys:
+            if key in design_config.keys():
+                config_dict.update({key:design_config[key]})
+            else:
+                raise ValueError(f'{key} not found in config JSON file!')
+       
+        variable_config= config_dict['variable_config']
+        logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
+        logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])
+        
+        #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
+        logscale = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
+              +[logscale_min-1]+[logscale_max+1]))
+        
+        config_dict.update({'logscale':logscale})   
+        
+        return config_dict    
+
+    def create_action_dict(self,combined_var_space,variable_config,environment_config):
+        """Create a dictionary of discrete actions."""
+        """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
+        
+        manipulated_var_space = combined_var_space.copy()
+        for variable in templates.constant_variables: #Remove constant variables
+            if variable in manipulated_var_space:
+                del manipulated_var_space[variable]
+        
+        n_increment_actions = environment_config['increment_actions_per_variable']
+        n_decrement_actions = environment_config['decrement_actions_per_variable']
+        
+        total_increment_actions = n_increment_actions*len(manipulated_var_space) 
+        total_decrement_actions = n_decrement_actions*len(manipulated_var_space)
+        
+        logger.info(f'Following action variables were found:{[j.strip("-012") for j in manipulated_var_space.keys()]}')
+        logger.info(f'Total increment actions:{total_increment_actions},Total decrement actions:{total_decrement_actions}')
+        
+        action_dict = {}
+        action_dict.update({0:{}})    
+        i = 1
+        
+        for variable,index in manipulated_var_space.items():
+            if n_increment_actions>0:
+                for j in range(1,n_increment_actions+1):
+                    action_variable = variable.strip('-012')  #Remove module numbers from variables list
+                    if variable_config[action_variable]['scale'] == 'linear':
+                        delta_value = j*variable_config[action_variable]['delta']
+                    elif variable_config[action_variable]['scale'] == 'discrete':
+                        delta_value = int(j*variable_config[action_variable]['delta'])                
+                    elif variable_config[action_variable]['scale'] == 'log':
+                        delta_value = 10**(j*variable_config[action_variable]['delta']) #Convert log to actual number
+                    elif variable_config[action_variable]['scale'] == 'pH':
+                        delta_value = 10**(-j*variable_config[action_variable]['delta']) #Convert pH to actual number
+                    
+                    else:
+                        raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in increment action!')
+                    
+                    action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
+                    logger.info(f'Converted incriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')
+                    i = i+1
+                    
+            if n_decrement_actions>0:
+                for k in range(1,n_decrement_actions+1):
+                    if variable_config[action_variable]['scale'] == 'linear':
+                        delta_value = -k*variable_config[action_variable]['delta']
+                    elif variable_config[action_variable]['scale'] == 'discrete':
+                        delta_value = int(-k*variable_config[action_variable]['delta'])        
+                    elif variable_config[action_variable]['scale'] == 'log':
+                        delta_value = -10**(k*variable_config[action_variable]['delta']) #Convert log to actual number
+                    elif variable_config[action_variable]['scale'] == 'pH':
+                        delta_value = -10**(-k*variable_config[action_variable]['delta']) #Convert pH to actual number                
+                    else:
+                        raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in decrement action!')                
+                    action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
+                    logger.info(f'Converted decriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')                
+                    i = i+1
+        
+        return action_dict
+
+    def create_observation_dict(self,combined_var_space):
+        """Create a list of all design variables in every stage."""
+        
+        observed_var_space = combined_var_space.copy()
+        for variable in templates.constant_variables: #Remove constant variables
+            if variable in observed_var_space:
+                del observed_var_space[variable]
+        
+        logger.info(f'Following observation variables were found:{list(observed_var_space.keys())}')
+        
+        return observed_var_space
+    
+    def print2terminal(self,text_string):
+        """Print information based on verbosity."""
+        
+        if self.verbosity == 'DEBUG':
+           print(text_string)        
+        elif self.verbosity == 'INFO':
+           pass
+        else:
+            raise ValueError(f'{self.verbosity} is an invalid verbosity keyword!')
+   
 
 def read_config(file_name):
     """Load config json file and return dictionary."""
@@ -25,101 +141,6 @@ def get_logger(config_dict,instance):
     print(f'Logging level:{logger.level}')    
     return logger
 
-def get_config_dict(config_file):
-    """Read config file create confi dict."""
-    
-    assert 'json' in config_file, 'Config file must be a json file!'
-    config_keys = templates.config_keys
-    
-    design_config = read_config(config_file)
-    
-    config_dict = {}
-    for key in config_keys:
-        if key in design_config.keys():
-            config_dict.update({key:design_config[key]})
-        else:
-            raise ValueError(f'{key} not found in config JSON file!')
-   
-    variable_config= config_dict['variable_config']
-    logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
-    logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])
-    
-    #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
-    logscale     = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
-          +[logscale_min-1]+[logscale_max+1]))
-    
-    config_dict.update({'logscale':logscale})   
-    
-    return config_dict    
-
-
-def create_action_dict(combined_var_space,variable_config,environment_config):
-    """Create a dictionary of discrete actions."""
-    """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
-    
-    omitted_variables = ['mol_frac-Nd','mol_frac-Pr','mol_frac-Ce','mol_frac-La']
-    for variable in omitted_variables:
-        if variable in combined_var_space:
-            del combined_var_space[variable]
-    
-    #action_variables = [j.strip('-012') for j in combined_var_space.keys()] #Remove module numbers from variables list
-    n_increment_actions = environment_config['increment_actions_per_variable']
-    n_decrement_actions = environment_config['decrement_actions_per_variable']
-    
-    total_increment_actions = n_increment_actions*len(combined_var_space) 
-    total_decrement_actions = n_decrement_actions*len(combined_var_space)
-    
-    print(f'Following action variables were found:{[j.strip("-012") for j in combined_var_space.keys()]}')
-    print(f'Total increment actions:{total_increment_actions},Total decrement actions:{total_decrement_actions}')
-    
-    action_dict = {}
-    action_dict.update({0:{}})    
-    i = 1
-    
-    for variable,index in combined_var_space.items():
-        if n_increment_actions>0:
-            for j in range(1,n_increment_actions+1):
-                action_variable = variable.strip('-012') 
-                if variable_config[action_variable]['scale'] == 'linear':
-                    delta_value = j*variable_config[action_variable]['delta']
-                elif variable_config[action_variable]['scale'] == 'discrete':
-                    delta_value = int(j*variable_config[action_variable]['delta'])                
-                elif variable_config[action_variable]['scale'] == 'log':
-                    delta_value = 10**(j*variable_config[action_variable]['delta']) #Convert log to actual number
-                elif variable_config[action_variable]['scale'] == 'pH':
-                    delta_value = 10**(-j*variable_config[action_variable]['delta']) #Convert pH to actual number
-                
-                else:
-                    raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in increment action!')
-                
-                action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
-                print(f'Converted incriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')
-                i = i+1
-                
-        if n_decrement_actions>0:
-            for k in range(1,n_decrement_actions+1):
-                if variable_config[action_variable]['scale'] == 'linear':
-                    delta_value = -k*variable_config[action_variable]['delta']
-                elif variable_config[action_variable]['scale'] == 'discrete':
-                    delta_value = int(-k*variable_config[action_variable]['delta'])        
-                elif variable_config[action_variable]['scale'] == 'log':
-                    delta_value = -10**(k*variable_config[action_variable]['delta']) #Convert log to actual number
-                elif variable_config[action_variable]['scale'] == 'pH':
-                    delta_value = -10**(-k*variable_config[action_variable]['delta']) #Convert pH to actual number                
-                else:
-                    raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in decrement action!')                
-                action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
-                print(f'Converted decriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')                
-                i = i+1
-    
-    return action_dict
-
-def create_variables_list(combined_var_space):
-    """Create a list of all design variables in every stage."""
-    
-    observation_variables = list(combined_var_space.keys())
-    
-    return observation_variables
     
 #rounds number to the nearest value `nearest`
 #`nearest` must be between 0-1

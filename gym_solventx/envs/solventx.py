@@ -1,18 +1,18 @@
-import gym, random, math, sys
+import gym, random, math, sys, os
 import numpy  as np
 import pandas as pd
 import random 
 import time
 
-from   gym.utils import seeding
-from   io        import StringIO
-from   gym       import error, spaces, utils
+from gym.utils import seeding
+from io import StringIO
+from gym import error, spaces, utils, logger
 
 import matplotlib.pyplot as plt
 from solventx import solventx
 from gym_solventx.envs import utilities
 
-class SolventXEnv(gym.Env):
+class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
     """SolventX environment."""
     
     count = 0
@@ -34,11 +34,10 @@ class SolventXEnv(gym.Env):
         
         if not identifier:
            identifier = str(SolventXEnv.count)
-        self.name ='gym_solventx-v0_'+identifier
+        self.name ='SolventXEnv_'+str(os.getpid()) + '_' +identifier
         
-        config_dict = utilities.get_config_dict(config_file) #Get configuration dictionary
-        self.logger = utilities.get_logger(config_dict,self)
-        self.logger.info('Creating process design environment!')        
+        config_dict = self.get_config_dict(config_file) #Get configuration dictionary
+        
         
         self.verbosity = config_dict['logging_config']['verbosity']
         self.variable_config = config_dict['variable_config']
@@ -47,24 +46,28 @@ class SolventXEnv(gym.Env):
         self.reward_config = config_dict['reward_config']
         self.logscale = config_dict['logscale']
         
+        logger.set_level(eval('logger.'+self.verbosity)) #eval('logger.'+self.verbosity) #logger.DEBUG
+        #self.logger = utilities.get_logger(config_dict,self)
+        logger.info(f'Creating process design environment with ID:{self.name} - Logger verbosity set to {self.verbosity}!')
+        
         self.setup_simulation()
         self.setup_environment()                
        
-    @property
-    def envstate(self):
-        """Observation dictionary."""
+    #@property
+    #def envstate(self):
+    #    """Observation dictionary."""
         
-        return {self.observation_variables[i]: self.sx_design.x[i] for i in range(len(self.observation_variables))} 
+    #    return {self.observation_variables[i]: self.sx_design.x[i] for i in range(len(self.observation_variables))} 
     
     def setup_simulation(self):
         """Setup solvenx process simulation."""
         
-        print('----Setting up solvent extraction design simulation-----')
+        logger.debug('----Setting up solvent extraction design simulation-----')
         self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
         self.sx_design.get_process() #Get initial values of variables and inputs
         self.strip_groups = self.get_strip_groups()
         self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
-        self.logger.debug(f'Var space:{self.sx_design.combined_var_space},Number of inputs:{self.sx_design.num_input}')
+        logger.debug(f'{self.name}: Found variable space:{self.sx_design.combined_var_space} with {len(self.sx_design.combined_var_space)} elements,Number of inputs:{self.sx_design.num_input}')
         
         """
         module_list = []
@@ -79,22 +82,22 @@ class SolventXEnv(gym.Env):
     def setup_environment(self):
         """Setup solvenx learning environment."""
         
-        print('----Setting up solvent extraction learning environment-----')
+        logger.debug('----Setting up solvent extraction learning environment-----')
         self.check_reward_config()        
         
-        self.action_dict = utilities.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
-        self.observation_variables = utilities.create_variables_list(self.sx_design.combined_var_space)       
+        self.action_dict = self.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+        self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space)               
         
         self.action_space      = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_variables),),dtype=np.float32) #Necessary for environment to work
+        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
          
     def step(self, action): #return observation, reward, done, info
         
         if not self.done: #Only perform step if episode has not ended
             self.action_stats.update({action:self.action_stats[action]+1})
             self.steps += 1
-            text_string = f'Starting step:{self.steps}'
-            self.print2terminal(text_string)
+            logger.debug(f'{self.name}:Taking action {action} at step:{self.steps}')
+            
             if self.action_dict[action]: #Check if action exists
                 prev_state = self.sx_design.x.copy()   #save previous state
                 self.perform_action(action) #map action to variable and action type
@@ -112,8 +115,9 @@ class SolventXEnv(gym.Env):
                     self.done = True
         
             else:
-                print(f'No action found in:{self.action_dict[action]}')
-        
+                logger.debug(f'{self.name}:No action found in:{self.action_dict[action]}')
+            logger.info(f'{self.name}:Completed action {action} at step {self.steps} and got reward {self.reward:.3f}.')    
+            
         else:
             if self.convergence_failure:
                 print(f'Convergence failure after {self.steps} steps - Reset environment to start new simulation!')
@@ -148,8 +152,7 @@ class SolventXEnv(gym.Env):
             converged_modules = [stage for stage,converged in self.sx_design.status.items() if converged]
             assert len(converged_modules) == len(self.sx_design.status), 'All modules should converge'
             
-            text_string  =f'{self.name}:Equilibrium succeeded at step:{self.steps} for all modules:{converged_modules}'
-            self.print2terminal(text_string)
+            logger.debug(f'{self.name}:Equilibrium succeeded at step:{self.steps} for all modules:{converged_modules}')           
     
     def perform_action(self,action):
         """Perform action"""
@@ -188,7 +191,7 @@ class SolventXEnv(gym.Env):
         if not self.environment_config['randomize']:
             random.seed(100) #Keep same seed every episode environment should not be randomized
         
-        for variable,index in self.sx_design.combined_var_space.items():
+        for variable,index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
             variable_type = variable.strip('-012') 
             variable_upper_limit = self.variable_config[variable_type]['upper']
             variable_lower_limit = self.variable_config[variable_type]['lower']
@@ -214,7 +217,7 @@ class SolventXEnv(gym.Env):
             self.update_design_variable(variable_type,index,random_variable_value)
         
         self.run_simulation()
-        self.logger.debug('Solvent extraction design evaluation converged - initialization succeeded!')        
+        logger.debug('{self.name}:Solvent extraction design evaluation converged - initialization succeeded!')        
 
     def update_design_variable(self,x_type,x_index,new_x_value):
         """Update design variable."""
@@ -229,7 +232,7 @@ class SolventXEnv(gym.Env):
         else:
             change_direction = 'Decreasing'
         
-        print(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
+        logger.debug(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
         
         self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
    
@@ -266,15 +269,16 @@ class SolventXEnv(gym.Env):
                 for group in recovery:
                     metric_value = recovery[group][0] * purity[group] #Recovery*Purity
                     metrics[metric_type].update({group:{'metric_value':metric_value}})    
-                    text_string =f'{self.name}:Converted recovery {recovery[group][0]:.3f} and purity {purity[group]:.3f} from {group} into recority {metric_value:.3f}!'
-                    self.print2terminal(text_string)
+                    logger.debug(f'{self.name}:Converted recovery {recovery[group][0]:.3f} and purity {purity[group]:.3f} from {group} into recority {metric_value:.3f}!')
+                    
         return metrics #{'recovery':{'Strip-1':{'metric_value':[0.1],'elements':['Nd','Pr']}}}
     
     def get_reward(self):
         """Calculate and return reward."""
         
-        rewards = []
-        reward_stage = 0.0       
+        rewards_per_goal = []
+        #rewards_per_stage = []
+        #reward_stage = 0.0       
         metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
         
         for goal in self.environment_config['goals']:
@@ -282,12 +286,13 @@ class SolventXEnv(gym.Env):
                 raise ValueError(f'{goal} is not found in reward config!')
             #print('Metric dict:',metric_dict)
             metric_type= metric_dict[goal] #{'Strip-1':{'metric_value':[0.1],'elements':['Nd']}}
-            reward_stage = 0.0 #Reset sum of stages for each goal
-            for stage,stage_dict in metric_type.items():                
+            #reward_stage = 0.0 #Reset sum of stages for each goal
+            for stage,stage_dict in metric_type.items():    
+                rewards_per_stage = []
                 metric_reward = 0.0
-                for level,metric_config in self.reward_config['metrics'][goal].items():
-                    min_level = next(iter(self.reward_config['metrics'][goal])) #Get the key for the first threshold
-                    min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
+                for level,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
+                    min_level = next(iter(self.reward_config['metrics'][goal]['thresholds'])) #Get the key for the first threshold
+                    min_threshold = self.reward_config['metrics'][goal]['thresholds'][min_level]['threshold'] #Get the key for the first threhold
                     if 'threshold' in metric_config:
                         
                         if isinstance(stage_dict['metric_value'],list):
@@ -303,7 +308,7 @@ class SolventXEnv(gym.Env):
                             
                         if metric < min_threshold:
                             threshold_level = 'min'
-                            metric_reward = self.reward_config['min'] #Assign minumum value if below threshold
+                            metric_reward = self.reward_config['metrics'][goal]['min'] #Assign minumum value if below threshold
                             
                 if isinstance(metric_reward,(int,float)):
                     metric_reward = metric_reward
@@ -312,13 +317,20 @@ class SolventXEnv(gym.Env):
                 else:
                     raise(f'{metric_config["reward"]} is an invalid reward for stage:{stage}!')    
                 
-                text_string = f'{self.name}:Converted {goal}:{metric:.3f} from {stage} to reward {metric_reward:.3f} using threshold {threshold_level}'
-                self.print2terminal(text_string)
+                logger.debug(f'{self.name}:Converted {goal}:{metric:.3f} from {stage} to reward:{metric_reward:.3f} using threshold {threshold_level}')
                 
-                reward_stage = reward_stage +  metric_reward #Sum reward for each stage
+                #reward_stage = reward_stage +  metric_reward #Sum reward for each stage
+                rewards_per_stage.append(metric_reward) #Append reward for each stage
                 
-            rewards.append(reward_stage) #Append reward for each goal -[0.4,0.9]
-        return sum(rewards) #Sum rewards for all goals
+            rewards_per_goal.append(np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']) #Append reward for each goal -[0.4,0.9]
+            
+        reward = np.mean(rewards_per_goal) #sum(rewards) #Average rewards for all goals
+        logger.debug(f'{self.name}:Converted rewards:{rewards_per_goal} to {reward:.3f}')
+                
+        if not reward >=self.reward_config['min'] and reward <=self.reward_config['max']:
+            raise ValueError(f'Total reward {reward} should be between {self.reward_config["min"]} and {self.reward_config["max"]}')
+            
+        return reward
     
     def decipher_action(self,action):
         """Perform action"""
@@ -328,25 +340,23 @@ class SolventXEnv(gym.Env):
     def check_reward_config(self):
         """Check reward dictionary."""
         
+        reward_weights = []
+        
         for goal in self.environment_config['goals']:
-            min_level = next(iter(self.reward_config['metrics'][goal]))
-            min_threshold = self.reward_config['metrics'][goal][min_level]['threshold']
+            min_level = next(iter(self.reward_config['metrics'][goal]['thresholds']))
+            min_threshold = self.reward_config['metrics'][goal]['thresholds'][min_level]['threshold']
             print(f'Minimum threshold {min_level} for {goal} is:{min_threshold}')
             
-            for _,metric_config in self.reward_config['metrics'][goal].items():
+            for _,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
                 if min_threshold > metric_config['threshold']:
                     raise ValueError('Threshold for {goal}:{metric_config["threshold"]} should be greater than minimum threshold:{min_threshold}')
+            
+            reward_weights.append(self.reward_config['metrics'][goal]['weight'])
+        
+        if not math.isclose(np.mean(reward_weights), 1.0,abs_tol=0.001):
+            raise ValueError(f'Mean of the reward weights is {np.mean(reward_weights):.3f} which is greater that 1.0!')            
     
-    def print2terminal(self,text_string):
-        """Print information based on verbosity."""
-        
-        if self.verbosity == 'DEBUG':
-           print(text_string)        
-        elif self.verbosity == 'INFO':
-           pass
-        else:
-            raise ValueError(f'{self.verbosity} is an invalid verbosity keyword!')
-        
+         
     def render(self, mode='human', create_graph_every=False):
         '''
         create_graph_every: steps per graph generation
@@ -397,7 +407,7 @@ class SolventXEnv(gym.Env):
         """Shown the current design."""
         
         for i,state in enumerate(observation):
-            print(f'{self.observation_variables[i]}:{state:.4f}')    
+            print(f'{list(self.observation_variables.keys())[i]}:{state:.4f}')    
     
     def evaluate(self,agent):
         """Evaluate the environment."""

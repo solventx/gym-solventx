@@ -110,7 +110,12 @@ output.txt
 gym_solventx/envs/methods/figures/*
 gym_solventx/envs/methods/output/*
 logs/*
-
+*.index
+*.data-00000-of-00001
+*.pb
+*.pbtxt
+*.v2
+checkpoint
 
 #IDE
 .vscode

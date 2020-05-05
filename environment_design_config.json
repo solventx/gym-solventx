@@ -1,8 +1,8 @@
 {
 "variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
-                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH" }, 
-                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH"  }, 
-                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH"  }, 
+                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
+                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
+                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
                     "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
                     "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
@@ -14,11 +14,12 @@
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
-"environment_config":{"randomize":true,"goals":["recority","recovery","purity"],
+"environment_config":{"random_seed":100,"goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.985}},
+                      "discrete_actions":false,
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
                       "max_episode_steps":100},
-"logging_config":{"verbosity":"DEBUG"},
-"reward_config":{"discrete_reward":false,"min":-1.0,"max":1.0,
+"logging_config":{"verbosity":"INFO"},
+"reward_config":{"min":-1.0,"max":1.0,
                  "metrics":{"recovery":{"weight":1.0,
                                         "min":0.0,
                                         "thresholds":{"0":{"threshold":0.8,"reward":1.0}

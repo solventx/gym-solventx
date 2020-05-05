@@ -31,10 +31,10 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         assert isinstance(config_file,str), 'Path to config file must be provided!'
         
         SolventXEnv.count = SolventXEnv.count+1 #Increment count to keep track of number of converter model instances
-        
+        self.pid = os.getpid()
         if not identifier:
            identifier = str(SolventXEnv.count)
-        self.name ='SolventXEnv_'+str(os.getpid()) + '_' +identifier
+        self.name ='SolventXEnv_'+str(self.pid) + '_' +identifier
         
         config_dict = self.get_config_dict(config_file) #Get configuration dictionary
         
@@ -47,26 +47,21 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         self.logscale = config_dict['logscale']
         
         logger.set_level(eval('logger.'+self.verbosity)) #eval('logger.'+self.verbosity) #logger.DEBUG
-        #self.logger = utilities.get_logger(config_dict,self)
         logger.info(f'Creating process design environment with ID:{self.name} - Logger verbosity set to {self.verbosity}!')
         
         self.setup_simulation()
-        self.setup_environment()                
-       
-    #@property
-    #def envstate(self):
-    #    """Observation dictionary."""
-        
-    #    return {self.observation_variables[i]: self.sx_design.x[i] for i in range(len(self.observation_variables))} 
+        self.setup_environment()  
     
     def setup_simulation(self):
         """Setup solvenx process simulation."""
         
-        logger.debug('----Setting up solvent extraction design simulation-----')
+        logger.debug(f'{self.name}:----Setting up solvent extraction design simulation-----')
         self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
         self.sx_design.get_process() #Get initial values of variables and inputs
         self.strip_groups = self.get_strip_groups()
         self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
+        
+        logger.info(f'{self.name}:Created Solvent Extraction simulation object:{self.sx_design} for environment!')
         logger.debug(f'{self.name}: Found variable space:{self.sx_design.combined_var_space} with {len(self.sx_design.combined_var_space)} elements,Number of inputs:{self.sx_design.num_input}')
         
         """
@@ -83,70 +78,85 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         """Setup solvenx learning environment."""
         
         logger.debug('----Setting up solvent extraction learning environment-----')
-        self.check_reward_config()        
+        self.check_reward_config()  
         
-        self.action_dict = self.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
-        self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space)               
-        
-        self.action_space      = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
+        self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space)        
         self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
-         
+               
+        if self.environment_config['discrete_actions']:
+            self.action_dict = self.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+            self.action_space = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
+        else:
+            self.action_dict = self.create_continuous_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+            self.action_space = spaces.Box(1.00E-05,8.0, (len(self.observation_dict),), dtype=np.float32)   
+            #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
+          
     def step(self, action): #return observation, reward, done, info
         
         if not self.done: #Only perform step if episode has not ended
-            self.action_stats.update({action:self.action_stats[action]+1})
             self.steps += 1
             logger.debug(f'{self.name}:Taking action {action} at step:{self.steps}')
             
-            if self.action_dict[action]: #Check if action exists
-                prev_state = self.sx_design.x.copy()   #save previous state
-                self.perform_action(action) #map action to variable and action type
+            prev_state = self.sx_design.x.copy()   #save previous state
+            if self.environment_config['discrete_actions']:
+               self.action_stats.update({action:self.action_stats[action]+1})                        
+               if self.action_dict[action]: #Check if discrete action exists                  
+                  self.perform_discrete_action(action) #map action to variable and action type
+                  self.run_simulation()
+               else:
+                  logger.info(f'{self.name}:No action found in:{self.action_dict[action]}')
+            else:
+               self.perform_continuous_action(action) #map continuous action to variable type                 
+               self.run_simulation()            
                 
-                self.run_simulation()
-                
-                if not self.convergence_failure: #Calculate reward if there is no convergence failure
-                    self.reward = self.get_reward()                    
-                else: #Replace with previous state if there is convergence failure
+            if not self.convergence_failure: #Calculate reward if there is no convergence failure
+                    reward = self.get_reward()                    
+            else: #Replace with previous state if there is convergence failure
                     self.sx_design.x = prev_state
                     self.done   = True
-                    self.reward = self.reward_config['min'] #-100 #Assign minimum reward if convergence failure
-                
-                if self.steps >= self.max_episode_steps: #Check if max episode steps reached
-                    self.done = True
-        
-            else:
-                logger.debug(f'{self.name}:No action found in:{self.action_dict[action]}')
-            logger.info(f'{self.name}:Completed action {action} at step {self.steps} and got reward {self.reward:.3f}.')    
+                    reward = self.reward_config['min'] #-100 #Assign minimum reward if convergence failure
             
+            logger.info(f'{self.name}:Completed action {action} at step {self.steps} and got reward {reward:.3f}.')
+            if self.steps >= self.max_episode_steps: #Check if max episode steps reached
+                    self.done = True
+                    logger.info(f'{self.name}:Maximum episode steps exceeded after {self.steps} steps - Ending episode!')                
+            if all(self.design_success.values()): #Check if design was successful
+                    self.done = True
+                    logger.info(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]} after {self.steps} steps - Ending episode!')
+        
         else:
             if self.convergence_failure:
-                print(f'Convergence failure after {self.steps} steps - Reset environment to start new simulation!')
+                print(f'Episode completed after {self.steps} steps due to Convergence failure - Reset environment to start new simulation!')
+            elif self.steps >= self.max_episode_steps:
+                print(f'Episode completed after {self.steps} steps since max steps were exceeded - Reset environment to start new simulation!')
+            elif all(self.design_success.values()):
+                print(f'Episode completed after {self.steps} steps since design goals was met - Reset environment to start new simulation!')            
             else:
-                print(f'Episode completed after {self.steps} steps - Reset environment to start new simulation!')
+                print(f'Episode completed after {self.steps} steps due to unknown reason - Reset environment to start new simulation!')
         
-        return self.sx_design.x, self.reward, self.done, {}
+        return self.sx_design.x, reward, self.done, {}
     
     def run_simulation(self):
-        """Perform action"""        
+        """Run solvent extraction simulation"""        
         
         try: #Solve design and check for convergence
             self.sx_design.evaluate_open(x=self.sx_design.x)
             
         #except (RuntimeError, ValueError, EOFError,MemoryError,ZeroDivisionError):
         except:    
-            print(f'{self.name}:Exception of type:{sys.exc_info()[0]} occured!')
-            print(f'{self.name}:Design evaluation Failed at step:{self.steps} - Terminating environment!')
+            logger.error(f'{self.name}:Exception of type:{sys.exc_info()[0]} occured!')
+            logger.error(f'{self.name}:Design evaluation Failed at step:{self.steps} - Terminating environment!')
             self.convergence_failure = True
         
         else: #Execute if no exception has occured
             self.check_design_convergence() #Double check convergence in all stages
     
     def check_design_convergence(self):
-        """Perform action"""
+        """Check if solvent extraction simulation is feasible."""
         
         if not all(self.sx_design.status.values()):
             failed_modules = [stage for stage,converged in self.sx_design.status.items() if not converged]
-            print(f'{self.name}:Equilibrium failed at step:{self.steps} due to non-convergence in following modules:{failed_modules} - Terminating environment!')
+            logger.error(f'{self.name}:Equilibrium failed at step:{self.steps} due to non-convergence in following modules:{failed_modules} - Terminating environment!')
             self.convergence_failure = True    
         else:
             converged_modules = [stage for stage,converged in self.sx_design.status.items() if converged]
@@ -154,7 +164,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             
             logger.debug(f'{self.name}:Equilibrium succeeded at step:{self.steps} for all modules:{converged_modules}')           
     
-    def perform_action(self,action):
+    def perform_discrete_action(self,action):
         """Perform action"""
         
         variable_type = self.action_dict[action]['type'] #Get variable type        
@@ -165,32 +175,53 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         self.update_design_variable(variable_type,variable_index,new_variable_value)
     
+    def perform_continuous_action(self,action):
+        """Perform action"""
+        
+        for index,new_variable_value in enumerate(action):
+            variable_type = self.action_dict[index]['type'] #Get variable type        
+            variable_index = self.action_dict[index]['index'] #Get variable index   
+            
+            self.update_design_variable(variable_type,variable_index,new_variable_value)
+        
     def reset(self):
         """Reset environment."""
         
+        if not self.pid == os.getpid():
+            logger.warn(f'PID changed from {self.pid} to {os.getpid()}!')
+            self.pid == os.getpid()
+            
         self.steps             = 0
         self.done              = False
        
         self.convergence_failure = False
+        self.design_success =  {}
         self.invalid           = False
+        
+        if hasattr(self,'metric_dict'):
+            del self.metric_dict
         
         self.max_episode_steps = min(self.environment_config['max_episode_steps'],self.spec.max_episode_steps)
         self.reset_simulation()
         
-        self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
+        if self.environment_config['discrete_actions']:
+           self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
                 
-        self.reward      = self.get_reward()
-        self.best_reward = self.reward
+        #self.reward      = self.get_reward()
+        #self.best_reward = self.reward
 
         return self.sx_design.x
    
     def reset_simulation(self):
         """Initialize design variables."""
         
-        print('----Reseting simulation-----')
-        if not self.environment_config['randomize']:
-            random.seed(100) #Keep same seed every episode environment should not be randomized
+        logger.debug(f'{self.name}:----Reseting simulation-----')
+        if self.environment_config['random_seed']: #Check if seed is available
+            random.seed(self.environment_config['random_seed']) #Keep same seed every episode environment should not be randomized
+        else:
+            random.seed(utils.seeding.create_seed())            #Randomly generate a seed in every episode
         
+        logger.debug(f'{self.name}:Initial state:{self.sx_design.x}')
         for variable,index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
             variable_type = variable.strip('-012') 
             variable_upper_limit = self.variable_config[variable_type]['upper']
@@ -207,21 +238,21 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             else:
                 raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
             
-            if variable_type== "H+ Extraction":
-                random_variable_value = self.variable_config[variable_type]['lower']
-            if variable_type== "H+ Scrub":
-                random_variable_value = self.variable_config[variable_type]['lower']            
-            if variable_type== "H+ Strip":
-                random_variable_value = self.variable_config[variable_type]['upper']            
-                
+            if "initial_value" in self.variable_config[variable_type]:
+                 random_variable_value = self.variable_config[variable_type]['initial_value']
+                 
+            logger.debug(f'{self.name}:Initializing {variable_type} with {random_variable_value}')
             self.update_design_variable(variable_type,index,random_variable_value)
         
         self.run_simulation()
-        logger.debug('{self.name}:Solvent extraction design evaluation converged - initialization succeeded!')        
+        logger.debug(f'{self.name}:Solvent extraction design evaluation converged - initialization succeeded!')        
 
     def update_design_variable(self,x_type,x_index,new_x_value):
         """Update design variable."""
         
+        if self.variable_config[x_type]["scale"] == 'discrete':
+           new_x_value = round(new_x_value)
+            
         x_upper_limit = self.variable_config[x_type]['upper']
         x_lower_limit = self.variable_config[x_type]['lower']
         
@@ -277,16 +308,13 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         """Calculate and return reward."""
         
         rewards_per_goal = []
-        #rewards_per_stage = []
-        #reward_stage = 0.0       
-        metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
+        self.metric_dict = self.get_metrics() #{'recovery':{'Strip-1':[0.1]}}
         
         for goal in self.environment_config['goals']:
             if goal not in self.reward_config['metrics']:
                 raise ValueError(f'{goal} is not found in reward config!')
-            #print('Metric dict:',metric_dict)
-            metric_type= metric_dict[goal] #{'Strip-1':{'metric_value':[0.1],'elements':['Nd']}}
-            #reward_stage = 0.0 #Reset sum of stages for each goal
+            
+            metric_type= self.metric_dict[goal] #{'Strip-1':{'metric_value':[0.1],'elements':['Nd']}}
             for stage,stage_dict in metric_type.items():    
                 rewards_per_stage = []
                 metric_reward = 0.0
@@ -309,7 +337,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                         if metric < min_threshold:
                             threshold_level = 'min'
                             metric_reward = self.reward_config['metrics'][goal]['min'] #Assign minumum value if below threshold
-                            
+                        
                 if isinstance(metric_reward,(int,float)):
                     metric_reward = metric_reward
                 elif isinstance(metric_reward,str):
@@ -319,12 +347,12 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                 
                 logger.debug(f'{self.name}:Converted {goal}:{metric:.3f} from {stage} to reward:{metric_reward:.3f} using threshold {threshold_level}')
                 
-                #reward_stage = reward_stage +  metric_reward #Sum reward for each stage
                 rewards_per_stage.append(metric_reward) #Append reward for each stage
+                self.update_design_success(goal,stage,metric)
                 
             rewards_per_goal.append(np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']) #Append reward for each goal -[0.4,0.9]
             
-        reward = np.mean(rewards_per_goal) #sum(rewards) #Average rewards for all goals
+        reward = np.mean(rewards_per_goal) #Average rewards for all goals
         logger.debug(f'{self.name}:Converted rewards:{rewards_per_goal} to {reward:.3f}')
                 
         if not reward >=self.reward_config['min'] and reward <=self.reward_config['max']:
@@ -332,30 +360,23 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             
         return reward
     
+    def update_design_success(self,goal,stage,metric):
+        """Check wheather design goal was achieved."""
+        
+        if "success_threshold" in  self.environment_config['goals'][goal]:
+            if metric >= self.environment_config['goals'][goal]['success_threshold']:
+                self.design_success.update({goal:True})
+                logger.debug(f'{self.name}:Design was successful for {goal} in {stage} with value {metric:.3f} at step:{self.steps}.')
+            else:
+                self.design_success.update({goal:False})        
+    
     def decipher_action(self,action):
         """Perform action"""
         
-        print(f'{self.name}:Action {action} corresponds to {self.action_dict[action]}')        
-   
-    def check_reward_config(self):
-        """Check reward dictionary."""
-        
-        reward_weights = []
-        
-        for goal in self.environment_config['goals']:
-            min_level = next(iter(self.reward_config['metrics'][goal]['thresholds']))
-            min_threshold = self.reward_config['metrics'][goal]['thresholds'][min_level]['threshold']
-            print(f'Minimum threshold {min_level} for {goal} is:{min_threshold}')
-            
-            for _,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
-                if min_threshold > metric_config['threshold']:
-                    raise ValueError('Threshold for {goal}:{metric_config["threshold"]} should be greater than minimum threshold:{min_threshold}')
-            
-            reward_weights.append(self.reward_config['metrics'][goal]['weight'])
-        
-        if not math.isclose(np.mean(reward_weights), 1.0,abs_tol=0.001):
-            raise ValueError(f'Mean of the reward weights is {np.mean(reward_weights):.3f} which is greater that 1.0!')            
-    
+        if isinstance(action,(int,float)):
+           print(f'{self.name}:Action {action} corresponds to {self.action_dict[action]}')        
+        else:
+           print(f'{self.name}:Action {action} corresponds to {self.action_dict}')
          
     def render(self, mode='human', create_graph_every=False):
         '''

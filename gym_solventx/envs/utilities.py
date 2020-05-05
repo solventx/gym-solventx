@@ -40,6 +40,28 @@ class SolventXEnvUtilities:
         
         return config_dict    
 
+    def create_continuous_action_dict(self,combined_var_space,variable_config,environment_config):
+        """Create a dictionary of continuous actions."""
+        """{0:{},1:{'type':'(HA)2(org)','index':0},2:{'type':'H+ Scrub','index':1}}"""
+        
+        manipulated_var_space = combined_var_space.copy()
+        for variable in templates.constant_variables: #Remove constant variables
+            if variable in manipulated_var_space:
+                del manipulated_var_space[variable]
+                
+        logger.info(f'{self.name}:Following action variables were found:{[j.strip("-012") for j in manipulated_var_space.keys()]}')
+        logger.info(f'{self.name}:Creating continuous action dictionary...')
+        
+        continuous_action_dict = {}
+                
+        for variable,index in manipulated_var_space.items():
+            action = index
+            action_variable = variable.strip('-012')  #Remove module numbers from variables list
+            continuous_action_dict.update({action:{'type':action_variable,'index':index}})
+            logger.debug(f'{self.name}:Converted {variable} into action {action}')
+                        
+        return continuous_action_dict
+        
     def create_action_dict(self,combined_var_space,variable_config,environment_config):
         """Create a dictionary of discrete actions."""
         """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
@@ -57,7 +79,8 @@ class SolventXEnvUtilities:
         
         logger.info(f'Following action variables were found:{[j.strip("-012") for j in manipulated_var_space.keys()]}')
         logger.info(f'Total increment actions:{total_increment_actions},Total decrement actions:{total_decrement_actions}')
-        
+        logger.info(f'{self.name}:Creating discrete action dictionary...')
+       
         action_dict = {}
         action_dict.update({0:{}})    
         i = 1
@@ -79,7 +102,7 @@ class SolventXEnvUtilities:
                         raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in increment action!')
                     
                     action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
-                    logger.info(f'Converted incriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')
+                    logger.debug(f'{self.name}:Converted incriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')
                     i = i+1
                     
             if n_decrement_actions>0:
@@ -95,7 +118,7 @@ class SolventXEnvUtilities:
                     else:
                         raise ValueError(f'{variable_config[action_variable]["scale"]} is an invalid scale for {action_variable} in decrement action!')                
                     action_dict.update({i:{'type':action_variable,'delta':delta_value,'index':index}})
-                    logger.info(f'Converted decriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')                
+                    logger.debug(f'{self.name}:Converted decriment {action_dict[i]["delta"]:.2f} ({variable_config[action_variable]["scale"]} scale) for variable {action_variable} into action {i}')                
                     i = i+1
         
         return action_dict
@@ -111,6 +134,25 @@ class SolventXEnvUtilities:
         logger.info(f'Following observation variables were found:{list(observed_var_space.keys())}')
         
         return observed_var_space
+    
+    def check_reward_config(self):
+        """Check reward dictionary."""
+        
+        reward_weights = []
+        
+        for goal in self.environment_config['goals']:
+            min_level = next(iter(self.reward_config['metrics'][goal]['thresholds']))
+            min_threshold = self.reward_config['metrics'][goal]['thresholds'][min_level]['threshold']
+            logger.debug(f'Minimum threshold {min_level} for {goal} is:{min_threshold}')
+            
+            for _,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
+                if min_threshold > metric_config['threshold']:
+                    raise ValueError('Threshold for {goal}:{metric_config["threshold"]} should be greater than minimum threshold:{min_threshold}')
+            
+            reward_weights.append(self.reward_config['metrics'][goal]['weight'])
+        
+        if not math.isclose(np.mean(reward_weights), 1.0,abs_tol=0.001):
+            raise ValueError(f'Mean of the reward weights is {np.mean(reward_weights):.3f} which is greater that 1.0!')            
     
     def print2terminal(self,text_string):
         """Print information based on verbosity."""

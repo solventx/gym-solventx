@@ -15,7 +15,7 @@ config_file = "../environment_design_config.json"
 
 env = gym.make('gym_solventx-v0', config_file=config_file,identifier='test')
 observation = env.reset()
-print(f'Initial Observation:{observation}\nInitial Reward:{env.reward},')
+print(f'Initial Observation:{observation}')
 
 print(f'Executing one step:')
 action = env.action_space.sample() 

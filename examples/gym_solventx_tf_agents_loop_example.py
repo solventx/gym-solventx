@@ -49,7 +49,13 @@ for i in range(n_episodes):
         print(f'Observation:{time_step.observation}')
         print(f'Reward:{time_step.reward}')
         episode_return += time_step.reward
-    print(f'Purity at episode {i+1}:{{key:value for key, value in tf_env._env._envs[0]._env.gym.env.sx_design.recovery.items() if key.startswith("Strip")}}')
+    
+    recovery = {key:value for key, value in tf_env._env._envs[0]._env.gym.env.sx_design.recovery.items() if key.startswith("Strip")}
+    purity = {key:value for key, value in tf_env._env._envs[0]._env.gym.env.sx_design.purity.items() if key.startswith("Strip")}
+
+    print(f'Recovery at episode {i+1}:{recovery}')
+    print(f'Purity at episode {i+1}:{purity}')
+    print(f'Design success at episode {i+1}:{tf_env._env._envs[0]._env.gym.env.design_success}')
     print(f'Total return at episode {i+1}:{episode_return}')
     total_return += episode_return
 print(f'Average return after {n_episodes}:{total_return/n_episodes}')    

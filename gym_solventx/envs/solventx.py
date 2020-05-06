@@ -84,11 +84,16 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
                
         if self.environment_config['discrete_actions']:
-            self.action_dict = self.create_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+            self.action_dict = self.create_discrete_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
             self.action_space = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
         else:
             self.action_dict = self.create_continuous_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
-            self.action_space = spaces.Box(1.00E-05,8.0, (len(self.observation_dict),), dtype=np.float32)   
+            lower_bound = np.array([self.action_dict[action]['min'] for action in self.action_dict])
+            upper_bound = np.array([self.action_dict[action]['max'] for action in self.action_dict])
+            print(lower_bound,upper_bound)
+            #self.action_space = spaces.Box(1.00E-05,8.0, (len(self.observation_dict),), dtype=np.float32)   
+            self.action_space = spaces.Box(low=lower_bound,high=upper_bound, dtype=np.float32)   
+            
             #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
           
     def step(self, action): #return observation, reward, done, info

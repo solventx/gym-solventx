@@ -57,12 +57,14 @@ class SolventXEnvUtilities:
         for variable,index in manipulated_var_space.items():
             action = index
             action_variable = variable.strip('-012')  #Remove module numbers from variables list
-            continuous_action_dict.update({action:{'type':action_variable,'index':index}})
+            continuous_action_dict.update({action:{'type':action_variable,'index':index,
+                                                   'min':variable_config[action_variable]['lower'],
+                                                   'max':variable_config[action_variable]['upper']}})
             logger.debug(f'{self.name}:Converted {variable} into action {action}')
                         
         return continuous_action_dict
         
-    def create_action_dict(self,combined_var_space,variable_config,environment_config):
+    def create_discrete_action_dict(self,combined_var_space,variable_config,environment_config):
         """Create a dictionary of discrete actions."""
         """{0:{},1:{'(HA)2(org)':0.05},2:{'(HA)2(org)':-0.05}}"""
         

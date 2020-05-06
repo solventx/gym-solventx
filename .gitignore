@@ -112,6 +112,7 @@ gym_solventx/envs/methods/output/*
 logs/*
 *.index
 *.data-00000-of-00001
+*.data-00000-of-00002
 *.pb
 *.pbtxt
 *.v2

@@ -1,15 +1,15 @@
 {
-"variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
-                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
-                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
-                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-05}, 
-                    "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear"  }, 
-                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"  }, 
-                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"  }, 
-                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete"  }
+"variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear","initial_value":0.65}, 
+                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
+                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
+                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":2.0}, 
+                    "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":2.0}, 
+                    "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":4.0}, 
+                    "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":6.0}, 
+                    "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear","initial_value":1.0}, 
+                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete","initial_value":8.0}, 
+                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete","initial_value":10.0}, 
+                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete","initial_value":4.0 }
                    },
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},

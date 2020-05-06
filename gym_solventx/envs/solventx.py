@@ -186,8 +186,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         for index,new_variable_value in enumerate(action):
             variable_type = self.action_dict[index]['type'] #Get variable type        
             variable_index = self.action_dict[index]['index'] #Get variable index   
-            
-            self.update_design_variable(variable_type,variable_index,new_variable_value)
+            if not self.variable_config[variable_type]['scale']  == 'pH':
+                self.update_design_variable(variable_type,variable_index,new_variable_value)
         
     def reset(self):
         """Reset environment."""
@@ -326,22 +326,21 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                 for level,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
                     min_level = next(iter(self.reward_config['metrics'][goal]['thresholds'])) #Get the key for the first threshold
                     min_threshold = self.reward_config['metrics'][goal]['thresholds'][min_level]['threshold'] #Get the key for the first threhold
-                    if 'threshold' in metric_config:
+                       
+                    if isinstance(stage_dict['metric_value'],list):
+                        metric = stage_dict['metric_value'][0]
+                    elif isinstance(stage_dict['metric_value'],(float,int)):
+                        metric = stage_dict['metric_value']
+                    else:
+                        raise ValueError(f'{type(stage_dict["metric_value"])} is an invalid metric value type!')
                         
-                        if isinstance(stage_dict['metric_value'],list):
-                            metric = stage_dict['metric_value'][0]
-                        elif isinstance(stage_dict['metric_value'],(float,int)):
-                            metric = stage_dict['metric_value']
-                        else:
-                            raise ValueError(f'{type(stage_dict["metric_value"])} is an invalid metric value type!')
-                        
-                        if metric >= metric_config['threshold']: #Check if metric above threshold
-                            threshold_level = level
-                            metric_reward = metric_config['reward']
+                    if metric >= metric_config['threshold']: #Check if metric above threshold
+                        threshold_level = level
+                        metric_reward = metric_config['reward']
                             
-                        if metric < min_threshold:
-                            threshold_level = 'min'
-                            metric_reward = self.reward_config['metrics'][goal]['min'] #Assign minumum value if below threshold
+                    if metric < min_threshold:
+                        threshold_level = 'min'
+                        metric_reward = self.reward_config['metrics'][goal]['min'] #Assign minumum value if below threshold
                         
                 if isinstance(metric_reward,(int,float)):
                     metric_reward = metric_reward

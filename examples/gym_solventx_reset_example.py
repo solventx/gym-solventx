@@ -14,8 +14,15 @@ import os
 config_file = "../environment_design_config.json"
 
 env = gym.make('gym_solventx-v0', config_file=config_file,identifier='test')
+
+print(f'Initial process design state:{env.sx_design.x}')
+
 observation = env.reset()
-print(f'Initial Observation:{observation}')
+print(f'Initial Observation 1:{observation}')
+observation = env.reset()
+print(f'Initial Observation 2:{observation}')
+observation = env.reset()
+print(f'Initial Observation 3:{observation}')
 
 print(f'Executing one step:')
 action = env.action_space.sample() 

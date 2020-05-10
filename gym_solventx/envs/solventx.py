@@ -82,20 +82,27 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space)        
         self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
-               
+        
+        manipulated_variables =  self.get_manipulated_variables(self.sx_design.combined_var_space,self.environment_config)
         if self.environment_config['discrete_actions']:
-            self.action_dict = self.create_discrete_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+            self.action_dict = self.create_discrete_action_dict(manipulated_variables,self.variable_config,self.environment_config)
             self.action_space = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
         else:
-            self.action_dict = self.create_continuous_action_dict(self.sx_design.combined_var_space,self.variable_config,self.environment_config)
+            self.action_dict = self.create_continuous_action_dict(manipulated_variables,self.variable_config,self.environment_config)
             lower_bound = np.array([self.action_dict[action]['min'] for action in self.action_dict])
             upper_bound = np.array([self.action_dict[action]['max'] for action in self.action_dict])
-            print(lower_bound,upper_bound)
-            #self.action_space = spaces.Box(1.00E-05,8.0, (len(self.observation_dict),), dtype=np.float32)   
             self.action_space = spaces.Box(low=lower_bound,high=upper_bound, dtype=np.float32)   
-            
+            #print(lower_bound,upper_bound)
+                        
             #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
-          
+        
+        self.purity_df = pd.DataFrame() #Collects over episode
+        self.recovery_df = pd.DataFrame() #Collects over episode
+        self.recority_df = pd.DataFrame() #Collects over episode 
+        
+        self.episode_count = 0
+        
+        
     def step(self, action): #return observation, reward, done, info
         
         if not self.done: #Only perform step if episode has not ended
@@ -124,10 +131,12 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             logger.info(f'{self.name}:Completed action {action} at step {self.steps} and got reward {reward:.3f}.')
             if self.steps >= self.max_episode_steps: #Check if max episode steps reached
                     self.done = True
-                    logger.info(f'{self.name}:Maximum episode steps exceeded after {self.steps} steps - Ending episode!')                
+                    logger.warn(f'{self.name}:Maximum episode steps exceeded after {self.steps} steps - Ending episode!')                
             if all(self.design_success.values()): #Check if design was successful
                     self.done = True
                     logger.info(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]} after {self.steps} steps - Ending episode!')
+            if self.done:
+                self.episode_end_logic()
         
         else:
             if self.convergence_failure:
@@ -178,16 +187,21 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         new_variable_value  = self.sx_design.x[variable_index] + variable_delta 
         
+        #if variable_type not in self.environment_config["subdued_variables"]:
         self.update_design_variable(variable_type,variable_index,new_variable_value)
-    
+        #else:
+        #    logger.debug(f'{self.name}:Not updating {variable_type} since it is in subdued variables list.')
+        
     def perform_continuous_action(self,action):
         """Perform action"""
         
         for index,new_variable_value in enumerate(action):
             variable_type = self.action_dict[index]['type'] #Get variable type        
             variable_index = self.action_dict[index]['index'] #Get variable index   
-            if not self.variable_config[variable_type]['scale']  == 'pH':
-                self.update_design_variable(variable_type,variable_index,new_variable_value)
+            #if variable_type not in self.environment_config["subdued_variables"]:
+            self.update_design_variable(variable_type,variable_index,new_variable_value)
+            #else:
+            #    logger.info(f'{self.name}:Not updating {variable_type} since it is in subdued variables list.')
         
     def reset(self):
         """Reset environment."""
@@ -222,9 +236,12 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         logger.debug(f'{self.name}:----Reseting simulation-----')
         if self.environment_config['random_seed']: #Check if seed is available
+            logger.info(f'{self.name}:Using constant random seed {self.environment_config["random_seed"]} from config file.')
             random.seed(self.environment_config['random_seed']) #Keep same seed every episode environment should not be randomized
         else:
-            random.seed(utils.seeding.create_seed())            #Randomly generate a seed in every episode
+            random_seed = utils.seeding.create_seed()
+            logger.info(f'{self.name}:Using newly generated random seed {random_seed}.')
+            random.seed(random_seed)            #Randomly generate a seed in every episode
         
         logger.debug(f'{self.name}:Initial state:{self.sx_design.x}')
         for variable,index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
@@ -245,7 +262,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             
             if "initial_value" in self.variable_config[variable_type]:
                  random_variable_value = self.variable_config[variable_type]['initial_value']
-                 
+                
             logger.debug(f'{self.name}:Initializing {variable_type} with {random_variable_value}')
             self.update_design_variable(variable_type,index,random_variable_value)
         
@@ -254,23 +271,27 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
 
     def update_design_variable(self,x_type,x_index,new_x_value):
         """Update design variable."""
-        
-        if self.variable_config[x_type]["scale"] == 'discrete':
-           new_x_value = round(new_x_value)
+                
+        if x_type not in self.environment_config["subdued_variables"]:
+            if self.variable_config[x_type]["scale"] == 'discrete':
+               new_x_value = round(new_x_value)
             
-        x_upper_limit = self.variable_config[x_type]['upper']
-        x_lower_limit = self.variable_config[x_type]['lower']
-        
-        x_delta = new_x_value - self.sx_design.x[x_index]
-        
-        if x_delta>0.0:
-            change_direction = 'Increasing'
+            x_upper_limit = self.variable_config[x_type]['upper']
+            x_lower_limit = self.variable_config[x_type]['lower']
+            
+            x_delta = new_x_value - self.sx_design.x[x_index]
+            
+            if x_delta>0.0:
+                change_direction = 'Increasing'
+            else:
+                change_direction = 'Decreasing'
+            
+            logger.debug(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
+            
+            self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
+            
         else:
-            change_direction = 'Decreasing'
-        
-        logger.debug(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
-        
-        self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
+            logger.debug(f'{self.name}:Not updating design @ step {self.steps}:{x_type} is in subdued variables list.')
    
     def get_strip_groups(self):
         """Initialize design variables."""
@@ -374,14 +395,20 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             else:
                 self.design_success.update({goal:False})        
     
-    def decipher_action(self,action):
-        """Perform action"""
+    def episode_end_logic(self):
+        """Logic at end of episode."""
         
-        if isinstance(action,(int,float)):
-           print(f'{self.name}:Action {action} corresponds to {self.action_dict[action]}')        
-        else:
-           print(f'{self.name}:Action {action} corresponds to {self.action_dict}')
-         
+        self.episode_count = self.episode_count  +1 #Incriment episode
+        recovery = {key:value[0] for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
+        purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
+        recority = {}
+        
+        for group in recovery:
+            metric_value = recovery[group] * purity[group] #Recovery*Purity
+            recority.update({group:metric_value}) 
+        
+        self.collect_all_metrics(recovery,purity,recority)    
+             
     def render(self, mode='human', create_graph_every=False):
         '''
         create_graph_every: steps per graph generation

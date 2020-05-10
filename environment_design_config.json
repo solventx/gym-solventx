@@ -1,24 +1,32 @@
 {
-"variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear","initial_value":0.65}, 
+"variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
                     "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
                     "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
                     "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":2.0}, 
-                    "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":2.0}, 
-                    "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":4.0}, 
-                    "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear","initial_value":6.0}, 
-                    "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear","initial_value":1.0}, 
-                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete","initial_value":8.0}, 
-                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete","initial_value":10.0}, 
-                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete","initial_value":4.0 }
+                    "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
+                    "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
+                    "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
+                    "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear"}, 
+                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"}, 
+                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"}, 
+                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete"}
                    },
                  
 "process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
-"environment_config":{"random_seed":100,"goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.985}},
+"environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.985}},
                       "discrete_actions":false,
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
-                      "max_episode_steps":100},
-"logging_config":{"verbosity":"INFO"},
+                      "max_episode_steps":100,
+                      "action_variables":["(HA)2(org)",
+                                          "H+ Extraction","H+ Scrub","H+ Strip",
+                                          "OA Extraction","OA Scrub","OA Strip",
+                                          "Recycle",
+                                          "Extraction","Scrub","Strip"],
+                      "subdued_variables":["H+ Extraction","H+ Scrub","H+ Strip"]
+                     },
+                     
+"logging_config":{"verbosity":"WARN"},
 "reward_config":{"min":-1.0,"max":1.0,
                  "metrics":{"recovery":{"weight":1.0,
                                         "min":0.0,

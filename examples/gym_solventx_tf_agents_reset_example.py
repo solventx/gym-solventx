@@ -33,11 +33,11 @@ print(env.action_spec())
 print('Time step:')
 print(time_step)
 
-action = np.array(1, dtype=np.int32)
+#action = np.array(1, dtype=np.int32)
 
-next_time_step = env.step(action)
-print('Next time step:')
-print(next_time_step)
+#next_time_step = env.step(action)
+#print('Next time step:')
+#print(next_time_step)
 
 #tf_env = tf_py_environment.TFPyEnvironment(py_env)
     

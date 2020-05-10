@@ -132,9 +132,9 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             if self.steps >= self.max_episode_steps: #Check if max episode steps reached
                     self.done = True
                     logger.warn(f'{self.name}:Maximum episode steps exceeded after {self.steps} steps - Ending episode!')                
-            if all(self.design_success.values()): #Check if design was successful
+            if all(self.design_success.values()) and not self.convergence_failure: #Check if design was successful
                     self.done = True
-                    logger.info(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]} after {self.steps} steps - Ending episode!')
+                    logger.warn(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]} after {self.steps} steps - Ending episode!')
             if self.done:
                 self.episode_end_logic()
         

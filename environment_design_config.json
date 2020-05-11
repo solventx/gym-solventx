@@ -17,7 +17,7 @@
 "environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.985}},
                       "discrete_actions":false,
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
-                      "max_episode_steps":100,
+                      "max_episode_steps":10,
                       "action_variables":["(HA)2(org)",
                                           "H+ Extraction","H+ Scrub","H+ Strip",
                                           "OA Extraction","OA Scrub","OA Strip",

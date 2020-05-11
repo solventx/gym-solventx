@@ -191,6 +191,15 @@ class SolventXEnvUtilities:
         logger.debug(f'{self.name}:Collecting recority at end of episode {self.episode_count}')
         self.recority_df = self.recority_df.append(recority, ignore_index=True)   
     
+    def collect_solvent_design(self,x):
+        """Collect recority in a dataframe."""
+        
+        logger.debug(f'{self.name}:Collecting design at end of episode {self.episode_count}')
+        
+        design_dict = {key:self.sx_design.x[index] for key, index in self.observation_dict.items()}
+        
+        self.design_df = self.design_df.append(design_dict, ignore_index=True)  
+    
     def show_metric_statistics(self):
         """Show metric statistics."""
         
@@ -200,6 +209,15 @@ class SolventXEnvUtilities:
         print(self.purity_df.describe())
         print(f'Recority statistics after {self.episode_count} episodes:')
         print(self.recority_df.describe())
+    
+    def show_solvent_design(self):
+        """Show metric statistics."""
+        
+        print(f'Solvent design over {self.episode_count} episodes:')
+        print(self.design_df)
+        print(f'Solvent design statistics after {self.episode_count} episodes:')
+        print(self.design_df.describe())
+    
     
     def decipher_action(self,action):
         """Perform action"""

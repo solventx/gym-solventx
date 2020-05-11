@@ -21,7 +21,7 @@ import tensorflow as tf
 np.set_printoptions(precision=3)
 
 
-def evaluate_agent(policy_location,env_name,config_file,num_episodes = 10):
+def evaluate_agent(policy_location,env_name,config_file,num_episodes = 1):
   """Test tf-agest policy"""
   
   tf_env = utilities.get_tf_env(env_name,config_file)
@@ -68,9 +68,10 @@ def evaluate_agent(policy_location,env_name,config_file,num_episodes = 10):
   print(f'List of returns after {num_episodes} episodes:{returns}')
   print(f'Average return:{np.mean(returns):.3f},Standard deviation:{np.std(returns):.3f}')
   tf_env._env._envs[0]._gym_env.env.show_metric_statistics()
-  #print(f'List of Recovery:{recovery_list}') 
-  #print(f'List of Purity:{purity_list}')     
-
+  tf_env._env._envs[0]._gym_env.env.show_solvent_design()
+  print(f'Solvent extraction state:{tf_env._env._envs[0]._gym_env.env.sx_design.x}')
+  print(f'Observation dictionary:{tf_env._env._envs[0]._gym_env.env.observation_dict}')
+  
 def get_policy(policy_location):
   """Load policy"""
   
@@ -81,7 +82,7 @@ def get_policy(policy_location):
 
 def main():
     policy_dir = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\examples\ppo_rnn_rev2\tensorboard\gym_solventx-v0\policy_saved_model"
-    policy_file = r"policy_000005150"
+    policy_file = r"policy_000024450"
     env_name = 'gym_solventx-v0'
     config_file = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\environment_design_config.json"
     

@@ -92,13 +92,13 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             lower_bound = np.array([self.action_dict[action]['min'] for action in self.action_dict])
             upper_bound = np.array([self.action_dict[action]['max'] for action in self.action_dict])
             self.action_space = spaces.Box(low=lower_bound,high=upper_bound, dtype=np.float32)   
-            #print(lower_bound,upper_bound)
-                        
+                                    
             #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
         
         self.purity_df = pd.DataFrame() #Collects over episode
         self.recovery_df = pd.DataFrame() #Collects over episode
         self.recority_df = pd.DataFrame() #Collects over episode 
+        self.design_df = pd.DataFrame() #Collects at end of episode
         
         self.episode_count = 0
         
@@ -407,7 +407,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             metric_value = recovery[group] * purity[group] #Recovery*Purity
             recority.update({group:metric_value}) 
         
-        self.collect_all_metrics(recovery,purity,recority)    
+        self.collect_all_metrics(recovery,purity,recority)
+        self.collect_solvent_design(self.sx_design.x)
              
     def render(self, mode='human', create_graph_every=False):
         '''

@@ -67,8 +67,9 @@ def evaluate_agent(policy_location,env_name,config_file,num_episodes = 1):
     
   print(f'List of returns after {num_episodes} episodes:{returns}')
   print(f'Average return:{np.mean(returns):.3f},Standard deviation:{np.std(returns):.3f}')
+  tf_env._env._envs[0]._gym_env.env.show_metrics_history()
   tf_env._env._envs[0]._gym_env.env.show_metric_statistics()
-  tf_env._env._envs[0]._gym_env.env.show_solvent_design()
+  tf_env._env._envs[0]._gym_env.env.show_design_history()
   print(f'Solvent extraction state:{tf_env._env._envs[0]._gym_env.env.sx_design.x}')
   print(f'Observation dictionary:{tf_env._env._envs[0]._gym_env.env.observation_dict}')
   
@@ -81,12 +82,13 @@ def get_policy(policy_location):
  
 
 def main():
-    policy_dir = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\examples\ppo_rnn_rev2\tensorboard\gym_solventx-v0\policy_saved_model"
-    policy_file = r"policy_000024450"
+    policy_dir = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\examples\ppo_rnn_rev3\tensorboard\gym_solventx-v0\policy_saved_model"
+    policy_file = r"policy_000017100"
     env_name = 'gym_solventx-v0'
     config_file = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\environment_design_config.json"
+    num_episodes = 2
     
-    evaluate_agent(os.path.join(policy_dir,policy_file),env_name,config_file)
+    evaluate_agent(os.path.join(policy_dir,policy_file),env_name,config_file,num_episodes)
 
 if __name__ == '__main__':
     main()

@@ -5,6 +5,6 @@ Created on Fri Apr 17 16:33:49 2020
 @author: splathottam
 """
 
-config_keys = ['variable_config','process_config','environment_config','reward_config','logging_config']
+config_keys = ['design_variable_config','composition_variable_config','process_config','environment_config','reward_config','logging_config']
 
 constant_variables = ['mol_frac-Nd','mol_frac-Pr','mol_frac-Ce','mol_frac-La']

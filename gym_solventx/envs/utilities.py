@@ -32,9 +32,9 @@ class SolventXEnvUtilities:
             else:
                 raise ValueError(f'{key} not found in config JSON file!')
        
-        variable_config= config_dict['variable_config']
-        logscale_min = min([variable_config['H+ Extraction']['lower'], variable_config['H+ Scrub']['lower'], variable_config['H+ Strip']['lower']])
-        logscale_max = max([variable_config['H+ Extraction']['upper'], variable_config['H+ Scrub']['upper'], variable_config['H+ Strip']['upper']])
+        design_variable_config = config_dict['design_variable_config']
+        logscale_min = min([design_variable_config['H+ Extraction']['lower'], design_variable_config['H+ Scrub']['lower'], design_variable_config['H+ Strip']['lower']])
+        logscale_max = max([design_variable_config['H+ Extraction']['upper'], design_variable_config['H+ Scrub']['upper'], design_variable_config['H+ Strip']['upper']])
         
         #log scaled list ranging from lower to upper bounds of h+, including an out of bounds value for invalid actions consistency
         logscale = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
@@ -135,13 +135,17 @@ class SolventXEnvUtilities:
         
         return action_dict
 
-    def create_observation_dict(self,combined_var_space):
+    def create_observation_dict(self,combined_var_space,input_compositions,observed_variables):
         """Create a list of all design variables in every stage."""
         
-        observed_var_space = combined_var_space.copy()
-        for variable in templates.constant_variables: #Remove constant variables
-            if variable in observed_var_space:
-                del observed_var_space[variable]
+        observed_var_space = {}
+        observed_var_space.update({variable:index for variable,index in combined_var_space.items() if variable.strip('-012') in observed_variables})
+        observed_var_space.update({component:index for index,component in enumerate(input_compositions) if component in observed_variables})
+                
+        #for variable in templates.constant_variables: #Remove constant variables
+        #    if variable in observed_var_space:
+        #        del observed_var_space[variable]
+        
         
         logger.info(f'Following observation variables were found:{list(observed_var_space.keys())}')
         
@@ -200,6 +204,13 @@ class SolventXEnvUtilities:
         
         self.design_df = self.design_df.append(design_dict, ignore_index=True)  
     
+    def show_metrics_history(self):
+        """Show metric statistics."""
+        
+        print(f'Recovery,Purity, and recority over {self.episode_count} episodes:')
+        print(pd.concat([self.recovery_df,self.purity_df,self.recority_df], axis=1))
+            
+    
     def show_metric_statistics(self):
         """Show metric statistics."""
         
@@ -210,7 +221,7 @@ class SolventXEnvUtilities:
         print(f'Recority statistics after {self.episode_count} episodes:')
         print(self.recority_df.describe())
     
-    def show_solvent_design(self):
+    def show_design_history(self):
         """Show metric statistics."""
         
         print(f'Solvent design over {self.episode_count} episodes:')

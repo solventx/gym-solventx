@@ -15,7 +15,7 @@ config_file = "../environment_design_config.json"
 
 env = gym.make('gym_solventx-v0', config_file=config_file,identifier='test')
 observation = env.reset()
-print(f'Initial Observation:{observation}\nReward:{env.reward},')
+print(f'Initial Observation:{observation}')
 
 for step in range(1,10):
     action = env.action_space.sample() 
@@ -24,7 +24,7 @@ for step in range(1,10):
     print(f'Observation:{observation}\nReward:{reward}\nDone:{done}')
     env.decipher_action(action)
 
-print(f'Final Observation:{observation}\nReward:{env.reward},')
+print(f'Final Observation:{observation}\nReward:{reward},')
     
 
     

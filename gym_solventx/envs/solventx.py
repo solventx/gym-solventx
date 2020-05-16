@@ -40,7 +40,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         
         self.verbosity = config_dict['logging_config']['verbosity']
-        self.variable_config = config_dict['variable_config']
+        self.design_variable_config = config_dict['design_variable_config']
+        self.composition_variable_config = config_dict['composition_variable_config']
         self.process_config = config_dict['process_config']
         self.environment_config = config_dict['environment_config']
         self.reward_config = config_dict['reward_config']
@@ -80,15 +81,16 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         logger.debug('----Setting up solvent extraction learning environment-----')
         self.check_reward_config()  
         
-        self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space)        
-        self.observation_space = spaces.Box(low=-100, high=100, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
+        self.observation_dict = self.create_observation_dict(self.sx_design.combined_var_space,self.sx_design.ree,self.environment_config['observed_variables'])        
+        self.observation_space = spaces.Box(low=-1.0, high=20, shape=(len(self.observation_dict),),dtype=np.float32) #Necessary for environment to work
+         
         
         manipulated_variables =  self.get_manipulated_variables(self.sx_design.combined_var_space,self.environment_config)
         if self.environment_config['discrete_actions']:
-            self.action_dict = self.create_discrete_action_dict(manipulated_variables,self.variable_config,self.environment_config)
+            self.action_dict = self.create_discrete_action_dict(manipulated_variables,self.design_variable_config,self.environment_config)
             self.action_space = spaces.Discrete(len(self.action_dict)) #Necessary for environment to work
         else:
-            self.action_dict = self.create_continuous_action_dict(manipulated_variables,self.variable_config,self.environment_config)
+            self.action_dict = self.create_continuous_action_dict(manipulated_variables,self.design_variable_config,self.environment_config)
             lower_bound = np.array([self.action_dict[action]['min'] for action in self.action_dict])
             upper_bound = np.array([self.action_dict[action]['max'] for action in self.action_dict])
             self.action_space = spaces.Box(low=lower_bound,high=upper_bound, dtype=np.float32)   
@@ -148,7 +150,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             else:
                 print(f'Episode completed after {self.steps} steps due to unknown reason - Reset environment to start new simulation!')
         
-        return self.sx_design.x, reward, self.done, {}
+        return np.array(self.sx_design.x+self.sx_design.ree_mass), reward, self.done, {}
     
     def run_simulation(self):
         """Run solvent extraction simulation"""        
@@ -187,10 +189,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         new_variable_value  = self.sx_design.x[variable_index] + variable_delta 
         
-        #if variable_type not in self.environment_config["subdued_variables"]:
         self.update_design_variable(variable_type,variable_index,new_variable_value)
-        #else:
-        #    logger.debug(f'{self.name}:Not updating {variable_type} since it is in subdued variables list.')
         
     def perform_continuous_action(self,action):
         """Perform action"""
@@ -198,11 +197,9 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         for index,new_variable_value in enumerate(action):
             variable_type = self.action_dict[index]['type'] #Get variable type        
             variable_index = self.action_dict[index]['index'] #Get variable index   
-            #if variable_type not in self.environment_config["subdued_variables"]:
+            
             self.update_design_variable(variable_type,variable_index,new_variable_value)
-            #else:
-            #    logger.info(f'{self.name}:Not updating {variable_type} since it is in subdued variables list.')
-        
+            
     def reset(self):
         """Reset environment."""
         
@@ -225,11 +222,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         if self.environment_config['discrete_actions']:
            self.action_stats = {action: 0 for action in range(self.action_space.n)}         #reset action stats
-                
-        #self.reward      = self.get_reward()
-        #self.best_reward = self.reward
-
-        return self.sx_design.x
+        
+        return np.array(self.sx_design.x+self.sx_design.ree_mass)
    
     def reset_simulation(self):
         """Initialize design variables."""
@@ -244,55 +238,102 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             random.seed(random_seed)            #Randomly generate a seed in every episode
         
         logger.debug(f'{self.name}:Initial state:{self.sx_design.x}')
-        for variable,index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
-            variable_type = variable.strip('-012') 
-            variable_upper_limit = self.variable_config[variable_type]['upper']
-            variable_lower_limit = self.variable_config[variable_type]['lower']
-            
-            if self.variable_config[variable_type]['scale']  == 'linear':
-                random_variable_value = round(random.uniform(variable_lower_limit, variable_upper_limit),3)                
-            elif self.variable_config[variable_type]['scale']  == 'discrete':
-                random_variable_value = random.randint(variable_lower_limit, variable_upper_limit)                            
-            elif self.variable_config[variable_type]['scale']  == 'log':
-                random_variable_value = random.choice(self.logscale)                
-            elif self.variable_config[variable_type]['scale']  == 'pH':
-                random_variable_value = random.choice(self.logscale)  
+        for variable,variable_index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
+            if variable.strip('-012') in self.design_variable_config:
+               variable_type = variable.strip('-012') 
+               variable_config = self.design_variable_config
+            elif variable in self.composition_variable_config:
+               variable_type = variable
+               variable_config = self.composition_variable_config 
             else:
-                raise ValueError('{} is not a valid variable scale!'.format(self.variable_config[variable_type]['scale'] ))
-            
-            if "initial_value" in self.variable_config[variable_type]:
-                 random_variable_value = self.variable_config[variable_type]['initial_value']
+               raise ValueError(f'{variable} is not found in variable config!')
                 
-            logger.debug(f'{self.name}:Initializing {variable_type} with {random_variable_value}')
-            self.update_design_variable(variable_type,index,random_variable_value)
+            variable_upper_limit = variable_config[variable_type]['upper']
+            variable_lower_limit = variable_config[variable_type]['lower']            
+            
+            if "initial_value" in variable_config[variable_type]:
+               random_variable_value = variable_config[variable_type]['initial_value']
+            else:
+               if variable_config[variable_type]['scale']  == 'linear':
+                  random_variable_value = round(random.uniform(variable_lower_limit, variable_upper_limit),3)                
+               elif variable_config[variable_type]['scale']  == 'discrete':
+                  random_variable_value = random.randint(variable_lower_limit, variable_upper_limit)                            
+               elif variable_config[variable_type]['scale']  == 'log':
+                  random_variable_value = random.choice(self.logscale)                
+               elif variable_config[variable_type]['scale']  == 'pH':
+                  random_variable_value = random.choice(self.logscale)  
+               else:
+                  raise ValueError('{} is not a valid variable scale!'.format(variable_config[variable_type]['scale'] ))
+                
+            logger.debug(f'{self.name}:Initializing {variable} with {random_variable_value}')
+                           
+            
+            self.update_variable(variable_type,variable_index,random_variable_value)
         
         self.run_simulation()
         logger.debug(f'{self.name}:Solvent extraction design evaluation converged - initialization succeeded!')        
 
+    def update_variable(self,variable_type,variable_index,new_variable_value):
+        """Update variable."""
+        
+        if variable_type in self.design_variable_config:
+           self.update_design_variable(variable_type,variable_index,new_variable_value)
+        elif variable_type in self.composition_variable_config:
+           self.update_composition_variable(variable_type,variable_index,new_variable_value)
+        else:
+           raise ValueError(f'{variable_type} is not found in variable config!')
+    
+    def update_composition_variable(self,compostion_type,composition_index,new_composition_value):
+        """Update compostion variable."""
+        
+        if compostion_type not in self.environment_config["masked_variables"]:
+            if self.composition_variable_config[compostion_type]["scale"] == 'discrete':
+               new_composition_value = round(new_composition_value)
+            
+            composition_upper_limit = self.composition_variable_config[compostion_type]['upper']
+            composition_lower_limit = self.composition_variable_config[compostion_type]['lower']
+            
+            composition_delta = new_composition_value - self.sx_design.ree_mass[composition_index]            
+            change_direction = self.get_update_direction(composition_delta)
+            logger.debug(f'{self.name}:Updating composition @ step {self.steps}:{change_direction} {compostion_type} (index:{composition_index},value:{self.sx_design.ree_mass[composition_index]:0.5f},delta:{composition_delta:0.5f}) to {new_composition_value:0.5f} (min:{composition_lower_limit},max:{composition_upper_limit})')
+            
+            ree_mass = self.sx_design.ree_mass.copy()
+            ree_mass[composition_index] = max(min(new_composition_value,composition_upper_limit),composition_lower_limit)
+            self.sx_design.get_conc(ree_mass)
+            
+        else:
+            logger.debug(f'{self.name}:Not updating composition @ step {self.steps}:{compostion_type} is in masked variables list.')
+    
     def update_design_variable(self,x_type,x_index,new_x_value):
         """Update design variable."""
                 
-        if x_type not in self.environment_config["subdued_variables"]:
-            if self.variable_config[x_type]["scale"] == 'discrete':
+        if x_type not in self.environment_config["masked_variables"]:
+            if self.design_variable_config[x_type]["scale"] == 'discrete':
                new_x_value = round(new_x_value)
             
-            x_upper_limit = self.variable_config[x_type]['upper']
-            x_lower_limit = self.variable_config[x_type]['lower']
+            x_upper_limit = self.design_variable_config[x_type]['upper']
+            x_lower_limit = self.design_variable_config[x_type]['lower']
             
             x_delta = new_x_value - self.sx_design.x[x_index]
-            
-            if x_delta>0.0:
-                change_direction = 'Increasing'
-            else:
-                change_direction = 'Decreasing'
-            
+            change_direction = self.get_update_direction(x_delta)
+             
             logger.debug(f'{self.name}:Updating design @ step {self.steps}:{change_direction} {x_type} (index:{x_index},value:{self.sx_design.x[x_index]:0.5f},delta:{x_delta:0.5f}) to {new_x_value:0.5f} (min:{x_lower_limit},max:{x_upper_limit})')
             
             self.sx_design.x[x_index] = max(min(new_x_value,x_upper_limit),x_lower_limit) #Check limits and update variable
             
         else:
-            logger.debug(f'{self.name}:Not updating design @ step {self.steps}:{x_type} is in subdued variables list.')
+            logger.debug(f'{self.name}:Not updating design @ step {self.steps}:{x_type} is in masked variables list.')
    
+    def get_update_direction(self,delta):
+        """Update design variable."""
+        
+        if delta>0.0:
+            change_direction = 'Increasing'
+        else:
+            change_direction = 'Decreasing'
+       
+        return change_direction
+    
     def get_strip_groups(self):
         """Initialize design variables."""
         

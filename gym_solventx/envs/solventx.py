@@ -97,10 +97,15 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                                     
             #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
         
-        self.purity_df = pd.DataFrame() #Collects over episode
-        self.recovery_df = pd.DataFrame() #Collects over episode
-        self.recority_df = pd.DataFrame() #Collects over episode 
-        self.design_df = pd.DataFrame() #Collects at end of episode
+        self.initial_purity_df = pd.DataFrame() #Collects over episode
+        self.initial_recovery_df = pd.DataFrame() #Collects over episode
+        self.initial_recority_df = pd.DataFrame() #Collects over episode
+        self.initial_design_df = pd.DataFrame() #Collects at end of episode
+        
+        self.final_purity_df = pd.DataFrame() #Collects over episode
+        self.final_recovery_df = pd.DataFrame() #Collects over episode
+        self.final_recority_df = pd.DataFrame() #Collects over episode 
+        self.final_design_df = pd.DataFrame() #Collects at end of episode
         
         self.episode_count = 0
         
@@ -109,6 +114,9 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         
         if not self.done: #Only perform step if episode has not ended
             self.steps += 1
+            if self.steps ==1: #Logic for first step in an episode
+                self.episode_start_logic()
+                
             logger.debug(f'{self.name}:Taking action {action} at step:{self.steps}')
             
             prev_state = self.sx_design.x.copy()   #save previous state
@@ -124,11 +132,11 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                self.run_simulation()            
                 
             if not self.convergence_failure: #Calculate reward if there is no convergence failure
-                    reward = self.get_reward()                    
-            else: #Replace with previous state if there is convergence failure
-                    self.sx_design.x = prev_state
-                    self.done   = True
-                    reward = self.reward_config['min'] #-100 #Assign minimum reward if convergence failure
+                reward = self.get_reward()                    
+            else: 
+                self.sx_design.x = prev_state #Replace with previous state if there is convergence failure
+                self.done   = True
+                reward = self.reward_config['min'] #-100 #Assign minimum reward if convergence failure
             
             logger.info(f'{self.name}:Completed action {action} at step {self.steps} and got reward {reward:.3f}.')
             if self.steps >= self.max_episode_steps: #Check if max episode steps reached
@@ -136,7 +144,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                     logger.warn(f'{self.name}:Maximum episode steps exceeded after {self.steps} steps - Ending episode!')                
             if all(self.design_success.values()) and not self.convergence_failure: #Check if design was successful
                     self.done = True
-                    logger.warn(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]} after {self.steps} steps - Ending episode!')
+                    reward = self.reward_config['max']
+                    logger.warn(f'{self.name}:Design successful with recovery:{self.metric_dict["recovery"]}, purity:{self.metric_dict["purity"]},Reward:{reward} after {self.steps} steps - Ending episode!')
             if self.done:
                 self.episode_end_logic()
         
@@ -436,20 +445,19 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             else:
                 self.design_success.update({goal:False})        
     
+    def episode_start_logic(self):
+        """Logic at start of episode."""
+        
+        self.collect_initial_metrics() 
+        self.collect_initial_design() 
+    
     def episode_end_logic(self):
         """Logic at end of episode."""
         
-        self.episode_count = self.episode_count  +1 #Incriment episode
-        recovery = {key:value[0] for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
-        purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
-        recority = {}
-        
-        for group in recovery:
-            metric_value = recovery[group] * purity[group] #Recovery*Purity
-            recority.update({group:metric_value}) 
-        
-        self.collect_all_metrics(recovery,purity,recority)
-        self.collect_solvent_design(self.sx_design.x)
+        self.episode_count = self.episode_count + 1 #Incriment episode
+                
+        self.collect_final_metrics()
+        self.collect_final_design()
              
     def render(self, mode='human', create_graph_every=False):
         '''

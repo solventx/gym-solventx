@@ -17,12 +17,12 @@
                                 "La": {"lower": 5, "upper": 10,"delta":0.25, "scale":"linear","unit":"kg/hr"}
                    },
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\updated_design.json"},
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
     
-"environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.985}},
+"environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.99}},
                       "discrete_actions":false,
                       "increment_actions_per_variable":1,"decrement_actions_per_variable":1,
-                      "max_episode_steps":10,
+                      "max_episode_steps":5,
                       "observed_variables":["(HA)2(org)",
                                                "H+ Extraction","H+ Scrub","H+ Strip",
                                                "OA Extraction","OA Scrub","OA Strip",

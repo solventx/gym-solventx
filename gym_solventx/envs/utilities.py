@@ -170,65 +170,156 @@ class SolventXEnvUtilities:
         if not math.isclose(np.mean(reward_weights), 1.0,abs_tol=0.001):
             raise ValueError(f'Mean of the reward weights is {np.mean(reward_weights):.3f} which is greater that 1.0!')            
     
-    def collect_all_metrics(self,recovery,purity,recority):
+    def get_simple_metrics(self):
+        """Return the solvent extraction design."""
+    
+        recovery = {key:value[0] for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
+        purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
+        recority = {}
+        
+        for group in recovery:
+            metric_value = recovery[group] * purity[group] #Recovery*Purity
+            recority.update({group:metric_value}) 
+        
+        return recovery,purity,recority
+    
+    def collect_initial_metrics(self):
+        """Collect inital metric values."""
+        
+        logger.info(f'{self.name}:Collecting metrics at beginning of episode {self.episode_count}')
+        recovery,purity,recority = self.get_simple_metrics()
+        self.collect_initial_recovery(recovery)    
+        self.collect_initial_purity(purity)        
+        self.collect_initial_recority(recority)        
+    
+    def collect_final_metrics(self):
         """Check reward dictionary."""
         
-        self.collect_purity_metric(purity)
-        self.collect_recovery_metric(recovery)    
-        self.collect_recority_metric(recority)
+        logger.info(f'{self.name}:Collecting metrics at end of episode {self.episode_count}')
+        recovery,purity,recority = self.get_simple_metrics()
+        self.collect_final_recovery(recovery)    
+        self.collect_final_purity(purity)        
+        self.collect_final_recority(recority)    
     
-    def collect_purity_metric(self,purity):
+    def collect_initial_purity(self,purity):
+        """Collect purity in a dataframe."""
+        
+        logger.debug(f'{self.name}:Collecting purity at beginning of  {self.episode_count}')
+        self.initial_purity_df = self.initial_purity_df.append(purity, ignore_index=True)
+    
+    def collect_initial_recovery(self,recovery):
+        """Collect recovery in a dataframe."""
+        
+        logger.debug(f'{self.name}:Collecting recovery at beginning of  {self.episode_count}')
+        self.initial_recovery_df = self.initial_recovery_df.append(recovery, ignore_index=True)
+
+    def collect_initial_recority(self,recority):
+        """Collect recority in a dataframe."""
+        
+        logger.debug(f'{self.name}:Collecting recority at beginning of  {self.episode_count}')
+        self.initial_recority_df = self.initial_recority_df.append(recority, ignore_index=True)      
+     
+    def collect_final_purity(self,purity):
         """Collect purity in a dataframe."""
         
         logger.debug(f'{self.name}:Collecting purity at end of episode {self.episode_count}')
-        self.purity_df = self.purity_df.append(purity, ignore_index=True)        
+        self.final_purity_df = self.final_purity_df.append(purity, ignore_index=True)        
    
-    def collect_recovery_metric(self,recovery):
+    def collect_final_recovery(self,recovery):
         """Collect recovery in a dataframe."""
         
         logger.debug(f'{self.name}:Collecting recovery at end of episode {self.episode_count}')
-        self.recovery_df = self.recovery_df.append(recovery, ignore_index=True)        
+        self.final_recovery_df = self.final_recovery_df.append(recovery, ignore_index=True)        
    
-    def collect_recority_metric(self,recority):
+    def collect_final_recority(self,recority):
         """Collect recority in a dataframe."""
         
         logger.debug(f'{self.name}:Collecting recority at end of episode {self.episode_count}')
-        self.recority_df = self.recority_df.append(recority, ignore_index=True)   
+        self.final_recority_df = self.final_recority_df.append(recority, ignore_index=True)   
     
-    def collect_solvent_design(self,x):
-        """Collect recority in a dataframe."""
+    def get_design(self):
+        """Return the solvent extraction design."""
         
-        logger.debug(f'{self.name}:Collecting design at end of episode {self.episode_count}')
-        
-        design_dict = {key:self.sx_design.x[index] for key, index in self.observation_dict.items()}
-        
-        self.design_df = self.design_df.append(design_dict, ignore_index=True)  
+        design_dict = {key:self.sx_design.x[index] for key, index in self.sx_design.combined_var_space.items() if key.strip('-012') in self.design_variable_config}
+        design_dict.update({composition:self.sx_design.ree_mass[index] for index, composition in enumerate(self.sx_design.ree) if composition in self.composition_variable_config})
+         
+        return design_dict
     
-    def show_metrics_history(self):
+    def collect_initial_design(self):
+        """Collect the solvent extraction design at end of episode."""
+        
+        design_dict = self.get_design()
+        logger.debug(f'{self.name}:Collecting design {design_dict} at start of episode {self.episode_count}')         
+        self.initial_design_df = self.initial_design_df.append(design_dict, ignore_index=True,sort=True)  
+       
+    def collect_final_design(self):
+        """Collect the solvent extraction design at end of episode."""
+                
+        design_dict = self.get_design()
+        logger.debug(f'{self.name}:Collecting design {design_dict} at end of episode {self.episode_count}')
+        self.final_design_df = self.final_design_df.append(design_dict, ignore_index=True,sort=True)  
+    
+    def show_all_initial_metrics(self):
+        """Show metric statistics for all episodes"""
+        
+        print(f'Initial Recovery,Purity, and recority over {self.episode_count} episodes:')
+        print(pd.concat([self.initial_recovery_df,self.initial_purity_df,self.initial_recority_df], axis=1))            
+        
+    def show_all_final_metrics(self):
+        """Show metric statistics for all episodes"""
+        
+        print(f'Final Recovery,Purity, and recority over {self.episode_count} episodes:')
+        print(pd.concat([self.final_recovery_df,self.final_purity_df,self.final_recority_df], axis=1))            
+    
+    def show_initial_metric_statistics(self):
         """Show metric statistics."""
         
-        print(f'Recovery,Purity, and recority over {self.episode_count} episodes:')
-        print(pd.concat([self.recovery_df,self.purity_df,self.recority_df], axis=1))
-            
-    
-    def show_metric_statistics(self):
-        """Show metric statistics."""
+        print(f'Initial Recovery statistics after {self.episode_count} episodes:')
+        print(self.initial_recovery_df.describe())
+        print(f'Initial Purity statistics after {self.episode_count} episodes:')
+        print(self.initial_purity_df.describe())
+        print(f'Initial Recority statistics after {self.episode_count} episodes:')
+        print(self.initial_recority_df.describe())
         
-        print(f'Recovery statistics after {self.episode_count} episodes:')
-        print(self.recovery_df.describe())
-        print(f'Purity statistics after {self.episode_count} episodes:')
-        print(self.purity_df.describe())
-        print(f'Recority statistics after {self.episode_count} episodes:')
-        print(self.recority_df.describe())
-    
-    def show_design_history(self):
-        """Show metric statistics."""
+    def show_final_metric_statistics(self):
+        """Show final metric statistics."""
         
-        print(f'Solvent design over {self.episode_count} episodes:')
-        print(self.design_df)
-        print(f'Solvent design statistics after {self.episode_count} episodes:')
-        print(self.design_df.describe())
+        print(f'Final Recovery statistics after {self.episode_count} episodes:')
+        print(self.final_recovery_df.describe())
+        print(f'Final Purity statistics after {self.episode_count} episodes:')
+        print(self.final_purity_df.describe())
+        print(f'Final Recority statistics after {self.episode_count} episodes:')
+        print(self.final_recority_df.describe())
+   
+    def show_initial_design(self):
+        """Show initial design statistics."""
+        
+        print(f'Initial solvent design over {self.episode_count} episodes:')
+        print(self.initial_design_df)
+        print(f'Initial solvent design statistics over {self.episode_count} episodes:')
+        print(self.initial_design_df.describe())
     
+    def show_final_design(self):
+        """Show final design statistics."""
+        
+        print(f'Final solvent design over {self.episode_count} episodes:')
+        print(self.final_design_df)
+        print(f'Final solvent design statistics over {self.episode_count} episodes:')
+        print(self.final_design_df.describe())    
+    
+    def save_metrics(self):
+        """Save metrics."""
+        
+        logger.info(f'{self.name}:Saving metrics dataframe for {self.episode_count} episodes')
+        pd.concat([self.initial_recovery_df,self.initial_purity_df,self.initial_recority_df], axis=1).to_csv(self.name+'_initial_metrics.csv')
+        pd.concat([self.final_recovery_df,self.final_purity_df,self.final_recority_df], axis=1).to_csv(self.name+'_final_metrics.csv')
+                
+    def save_design(self):
+        """Save metrics."""
+        
+        logger.info(f'{self.name}:Saving design dataframe for {self.episode_count} episodes')
+        self.initial_design_df.to_csv(self.name+'_initial_design.csv')
+        self.final_design_df.to_csv(self.name+'_final_design.csv')    
     
     def decipher_action(self,action):
         """Perform action"""

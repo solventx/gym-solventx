@@ -1,23 +1,7 @@
 {
-"design_variable_config": {"(HA)2(org)":    {"lower": 0.2,"upper": 0.6,"delta":0.05,"scale":"linear"}, 
-                    "H+ Extraction": {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
-                    "H+ Scrub":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":1.00E-04}, 
-                    "H+ Strip":      {"lower": 1.00E-05, "upper": 2,"delta":5, "scale":"pH","initial_value":2.0}, 
-                    "OA Extraction": {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "OA Scrub":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "OA Strip":      {"lower": 0.5,      "upper": 5.5,"delta":0.05, "scale":"linear"}, 
-                    "Recycle":       {"lower": 0,        "upper": 1,"delta":0.05, "scale":"linear"}, 
-                    "Extraction":    {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"}, 
-                    "Scrub":         {"lower": 2,        "upper": 8,"delta":1, "scale":"discrete"}, 
-                    "Strip":         {"lower": 2,        "upper": 6,"delta":1, "scale":"discrete"}
-                   },
-"composition_variable_config": {"Nd": {"lower": 5,"upper": 10,"delta":0.25, "scale":"linear","unit":"kg/hr"}, 
-                                "Pr": {"lower": 2, "upper": 10,"delta":0.25, "scale":"linear","unit":"kg/hr"}, 
-                                "Ce": {"lower": 5, "upper": 10,"delta":0.25, "scale":"linear","unit":"kg/hr"}, 
-                                "La": {"lower": 5, "upper": 10,"delta":0.25, "scale":"linear","unit":"kg/hr"}
-                   },
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design.json"},
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\design_b.json",
+                  "variable_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\env_design_config.json" },
     
 "environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.99}},
                       "discrete_actions":false,
@@ -36,11 +20,11 @@
                       "masked_variables":[]
                      },
                      
-"logging_config":{"verbosity":"INFO"},
+"logging_config":{"verbosity":"DEBUG"},
 "reward_config":{"min":-1.0,"max":1.0,
                  "metrics":{"recovery":{"weight":1.0,
                                         "min":0.0,
-                                        "thresholds":{"0":{"threshold":0.85,"reward":1.0}
+                                        "thresholds":{"0":{"threshold":0.8,"reward":1.0}
                                                      }      
                                        }, 
                            "purity":{"weight":1.0,

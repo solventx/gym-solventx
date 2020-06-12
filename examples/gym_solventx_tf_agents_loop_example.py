@@ -61,4 +61,4 @@ for i in range(n_episodes):
     total_return += episode_return
 
 print(f'Average return after {n_episodes}:{total_return/n_episodes}')    
-tf_env._env._envs[0]._gym_env.env.show_metric_statistics()
+tf_env._env._envs[0]._gym_env.env.show_final_metric_statistics()

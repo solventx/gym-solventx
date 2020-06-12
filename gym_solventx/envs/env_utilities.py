@@ -32,7 +32,11 @@ class SolventXEnvUtilities:
             else:
                 raise ValueError(f'{key} not found in config JSON file!')
        
-        design_variable_config = config_dict['design_variable_config']
+        return config_dict    
+
+    def get_logscale(self,design_variable_config):
+        """Calculate logscale."""
+        
         logscale_min = min([design_variable_config['H+ Extraction']['lower'], design_variable_config['H+ Scrub']['lower'], design_variable_config['H+ Strip']['lower']])
         logscale_max = max([design_variable_config['H+ Extraction']['upper'], design_variable_config['H+ Scrub']['upper'], design_variable_config['H+ Strip']['upper']])
         
@@ -40,10 +44,8 @@ class SolventXEnvUtilities:
         logscale = np.array(sorted(list(np.logspace(math.log10(logscale_min), math.log10(logscale_max), base=10, num=50))\
               +[logscale_min-1]+[logscale_max+1]))
         
-        config_dict.update({'logscale':logscale})   
-        
-        return config_dict    
-
+        return {'logscale':logscale}
+    
     def get_manipulated_variables(self,combined_var_space,environment_config):
         """Create a dictionary of continuous actions."""
         """{0:{},1:{'type':'(HA)2(org)','index':0},2:{'type':'H+ Scrub','index':1}}"""

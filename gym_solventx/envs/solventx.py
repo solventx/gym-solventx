@@ -9,10 +9,11 @@ from io import StringIO
 from gym import error, spaces, utils, logger
 
 import matplotlib.pyplot as plt
-from solventx import solventx
-from gym_solventx.envs import utilities
+import solventx
+from solventx import solventx,utilities
+from gym_solventx.envs import env_utilities
 
-class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
+class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
     """SolventX environment."""
     
     count = 0
@@ -37,17 +38,26 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         self.name ='SolventXEnv_'+str(self.pid) + '_' +identifier
         
         config_dict = self.get_config_dict(config_file) #Get configuration dictionary
-        
+                
+        process_config_file = config_dict['process_config']['design_config'] #build config
+        process_variable_config_file = config_dict['process_config']['variable_config']
         
         self.verbosity = config_dict['logging_config']['verbosity']
-        self.design_variable_config = config_dict['design_variable_config']
-        self.composition_variable_config = config_dict['composition_variable_config']
-        self.process_config = config_dict['process_config']
+        
+        self.process_config = utilities.read_config(process_config_file)
+        self.process_variable_config = utilities.read_config(process_variable_config_file)
+        
+        self.composition_variable_config = self.process_config['compositions']        
+        self.design_variable_config = self.process_variable_config['variable_config']
+        
+        logscale_dict = self.get_logscale(self.design_variable_config)
+        config_dict.update(logscale_dict)   
+        
         self.environment_config = config_dict['environment_config']
         self.reward_config = config_dict['reward_config']
         self.logscale = config_dict['logscale']
         
-        logger.set_level(eval('logger.'+self.verbosity)) #eval('logger.'+self.verbosity) #logger.DEBUG
+        logger.set_level(eval('logger.'+self.verbosity)) 
         logger.info(f'Creating process design environment with ID:{self.name} - Logger verbosity set to {self.verbosity}!')
         
         self.setup_simulation()
@@ -57,10 +67,16 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         """Setup solvenx process simulation."""
         
         logger.debug(f'{self.name}:----Setting up solvent extraction design simulation-----')
-        self.sx_design = solventx.solventx(config_file=self.process_config['design_config']) # instantiate object
-        self.sx_design.get_process() #Get initial values of variables and inputs
+        
+        cases = utilities.generate(self.process_config,1) #generate case
+        ree_mass = [item for item in cases['0'].values()] #select case
+        
+        self.sx_design = solventx.solventx(self.process_config, self.process_variable_config, ree_mass) # instantiate object
+        self.sx_design.evaluate(self.sx_design.design_variables) # 
+
+        #self.sx_design.get_process() #Get initial values of variables and inputs        
+        #self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
         self.strip_groups = self.get_strip_groups()
-        self.sx_design.create_var_space(input_feeds=1) #Create variable space parameters
         
         logger.info(f'{self.name}:Created Solvent Extraction simulation object:{self.sx_design} for environment!')
         logger.debug(f'{self.name}: Found variable space:{self.sx_design.combined_var_space} with {len(self.sx_design.combined_var_space)} elements,Number of inputs:{self.sx_design.num_input}')
@@ -74,7 +90,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                         module_list.append(module)
         print(f'Target modules:{module_list}')
         """
-    
+        
     def setup_environment(self):
         """Setup solvenx learning environment."""
         
@@ -107,8 +123,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         self.final_recority_df = pd.DataFrame() #Collects over episode 
         self.final_design_df = pd.DataFrame() #Collects at end of episode
         
-        self.episode_count = 0
-        
+        self.episode_count = 0        
         
     def step(self, action): #return observation, reward, done, info
         
@@ -165,7 +180,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         """Run solvent extraction simulation"""        
         
         try: #Solve design and check for convergence
-            self.sx_design.evaluate_open(x=self.sx_design.x)
+            self.sx_design.evaluate(x=self.sx_design.x)
             
         #except (RuntimeError, ValueError, EOFError,MemoryError,ZeroDivisionError):
         except:    
@@ -238,6 +253,8 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
         """Initialize design variables."""
         
         logger.debug(f'{self.name}:----Reseting simulation-----')
+        feed_concentration_case = utilities.generate(self.process_config,1) #generate case
+        
         if self.environment_config['random_seed']: #Check if seed is available
             logger.info(f'{self.name}:Using constant random seed {self.environment_config["random_seed"]} from config file.')
             random.seed(self.environment_config['random_seed']) #Keep same seed every episode environment should not be randomized
@@ -246,7 +263,7 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             logger.info(f'{self.name}:Using newly generated random seed {random_seed}.')
             random.seed(random_seed)            #Randomly generate a seed in every episode
         
-        logger.debug(f'{self.name}:Initial state:{self.sx_design.x}')
+        logger.debug(f'{self.name}:Initial state:{self.sx_design.design_variables}')
         for variable,variable_index in self.observation_dict.items(): #self.sx_design.combined_var_space.items():
             if variable.strip('-012') in self.design_variable_config:
                variable_type = variable.strip('-012') 
@@ -262,7 +279,13 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
             
             if "initial_value" in variable_config[variable_type]:
                random_variable_value = variable_config[variable_type]['initial_value']
-            else:
+               logger.debug(f'{self.name}:Using initial value {random_variable_value:.4f} from config for {variable}.')
+
+            elif variable in self.composition_variable_config:               
+               random_variable_value = feed_concentration_case['0'][variable]
+               logger.debug(f'{self.name}:Using feed concetration {random_variable_value:.2f} for {variable} generated by SolventX method!')
+             
+            else:               
                if variable_config[variable_type]['scale']  == 'linear':
                   random_variable_value = round(random.uniform(variable_lower_limit, variable_upper_limit),3)                
                elif variable_config[variable_type]['scale']  == 'discrete':
@@ -273,10 +296,10 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                   random_variable_value = random.choice(self.logscale)  
                else:
                   raise ValueError('{} is not a valid variable scale!'.format(variable_config[variable_type]['scale'] ))
-                
-            logger.debug(f'{self.name}:Initializing {variable} with {random_variable_value}')
+               logger.debug(f'{self.name}:Using feed concetration {random_variable_value:.2f} for {variable} generated by SolventX method!')
                            
-            
+            logger.debug(f'{self.name}:Initializing {variable} with {random_variable_value:.2f}')
+           
             self.update_variable(variable_type,variable_index,random_variable_value)
         
         self.run_simulation()
@@ -368,10 +391,12 @@ class SolventXEnv(gym.Env,utilities.SolventXEnvUtilities):
                 for group in recovery:
                     metric_value = recovery[group] #Recovery  
                     metrics[metric_type].update({group:{'metric_value':metric_value}}) #,'elements':strip_elements[group]
+                    logger.debug(f'{self.name}:Collected recovery {metric_value} from {group}.')
             if metric_type == 'purity':
                 for group in purity:
                     metric_value = purity[group] #Purity
-                    metrics[metric_type].update({group:{'metric_value':metric_value}})                   
+                    metrics[metric_type].update({group:{'metric_value':metric_value}})              
+                    logger.debug(f'{self.name}:Collected purity {metric_value:.3f} from {group}.')
             if metric_type == 'recority':
                 for group in recovery:
                     metric_value = recovery[group][0] * purity[group] #Recovery*Purity

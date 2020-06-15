@@ -483,6 +483,11 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
                 
         self.collect_final_metrics()
         self.collect_final_design()
+        
+        if self.episode_count%10 == 0:
+            logger.info(f'{self.name}:Saving datarframe at episode {self.episode_count}.')
+            self.save_metrics()
+            self.save_design()            
              
     def render(self, mode='human', create_graph_every=False):
         '''

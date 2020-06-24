@@ -32,7 +32,7 @@ Try out the demo [here.](https://github.com/solventx/gym-solventx/blob/master/de
 
 |Name| Process configuration| Episodes before solve | Purity,Recovery (mean,std dev) | Agent details | Train script |
 |--------------|-----------------------|----------|----------|-------|-------|
-| [Siby Jose Plathottam](https://github.com/sibyjackgrove) | Input: Nd,Pr | 2000 | Purity: 0.85,0.04           Recovery: 0.99,0.005 |PPO with RNN||
+| [Siby Jose Plathottam](https://github.com/sibyjackgrove) | Input: Nd, Pr, Ce, La | 2000 | Purity: 0.99,0.005          Recovery: 0.85,0.04 |PPO with RNN||
 
 ## Issues
 Please feel free to raise an issue for bugs or feature requests.

@@ -391,7 +391,7 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
         recovery = {key:value for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
         purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
         #strip_elements = {key:value for key, value in self.sx_design.target_rees.items() if key.startswith("Strip")}
-        print(self.sx_design.recovery,sx_design.purity)
+        print('Design:',self.sx_design.recovery,self.sx_design.purity)
         metrics = {}
         
         for metric_type in self.reward_config['metrics']: #Extract value for each metric
@@ -425,8 +425,8 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
                 raise ValueError(f'{goal} is not found in reward config!')
             
             metric_type= self.metric_dict[goal] #{'Strip-1':{'metric_value':[0.1],'elements':['Nd']}}
-            for stage,stage_dict in metric_type.items():    
-                rewards_per_stage = []
+            rewards_per_stage = []
+            for stage,stage_dict in metric_type.items():                    
                 metric_reward = 0.0
                 for level,metric_config in self.reward_config['metrics'][goal]['thresholds'].items():
                     min_level = next(iter(self.reward_config['metrics'][goal]['thresholds'])) #Get the key for the first threshold
@@ -458,11 +458,14 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
                 
                 rewards_per_stage.append(metric_reward) #Append reward for each stage
                 self.update_design_success(goal,stage,metric)
-                
-            rewards_per_goal.append(np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']) #Append reward for each goal -[0.4,0.9]
+                            
+            mean_reward_per_stage = np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']
+            logger.debug(f'{self.name}:Converted rewards per stage for {goal}:{rewards_per_stage} to {mean_reward_per_stage:.3f}')
+            #rewards_per_goal.append(np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']) #Append reward for each goal -[0.4,0.9]
+            rewards_per_goal.append(mean_reward_per_stage) #Append reward for each goal -[0.4,0.9]
             
         reward = np.mean(rewards_per_goal) #Average rewards for all goals
-        logger.debug(f'{self.name}:Converted rewards:{rewards_per_goal} to {reward:.3f}')
+        logger.debug(f'{self.name}:Converted rewards per goal:{rewards_per_goal} to {reward:.3f}')
                 
         if not reward >=self.reward_config['min'] and reward <=self.reward_config['max']:
             raise ValueError(f'Total reward {reward} should be between {self.reward_config["min"]} and {self.reward_config["max"]}')

@@ -391,7 +391,6 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
         recovery = {key:value for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
         purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
         #strip_elements = {key:value for key, value in self.sx_design.target_rees.items() if key.startswith("Strip")}
-        print('Design:',self.sx_design.recovery,self.sx_design.purity)
         metrics = {}
         
         for metric_type in self.reward_config['metrics']: #Extract value for each metric
@@ -461,7 +460,6 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
                             
             mean_reward_per_stage = np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']
             logger.debug(f'{self.name}:Converted rewards per stage for {goal}:{rewards_per_stage} to {mean_reward_per_stage:.3f}')
-            #rewards_per_goal.append(np.mean(rewards_per_stage)*self.reward_config['metrics'][goal]['weight']) #Append reward for each goal -[0.4,0.9]
             rewards_per_goal.append(mean_reward_per_stage) #Append reward for each goal -[0.4,0.9]
             
         reward = np.mean(rewards_per_goal) #Average rewards for all goals

@@ -175,14 +175,10 @@ class SolventXEnvUtilities:
     def get_simple_metrics(self):
         """Return the solvent extraction design."""
     
-        recovery = {key:value[0] for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
-        purity = {key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
-        recority = {}
-        
-        for group in recovery:
-            metric_value = recovery[group] * purity[group] #Recovery*Purity
-            recority.update({group:metric_value}) 
-        
+        recovery = {'agent-recovery-'+key:value[0] for key, value in self.sx_design.recovery.items() if key.startswith("Strip")}
+        purity = {'agent-purity-'+key:value for key, value in self.sx_design.purity.items() if key.startswith("Strip")}
+        recority = {'agent-recority-'+key:value[0] for key, value in self.sx_design.recority.items() if key.startswith("Strip")}
+                 
         return recovery,purity,recority
     
     def collect_initial_metrics(self):
@@ -340,6 +336,62 @@ class SolventXEnvUtilities:
            pass
         else:
             raise ValueError(f'{self.verbosity} is an invalid verbosity keyword!')
+
+def evaluate_agent(policy_location,env_name,config_file,num_episodes = 1):
+  """Test tf-agents policy"""
+  
+  tf_env = env_utilities.get_tf_env(env_name,config_file)
+  policy = get_policy(policy_location)
+
+  print(f'Policy type:{type(policy)}!')  
+  print(f'Testing for {num_episodes} episodes!')
+  
+  returns = []
+  recovery_list = []
+  purity_list = []
+  for episode in range(num_episodes):
+    time_step = tf_env.reset()
+    policy_state = policy.get_initial_state(tf_env.batch_size)
+
+    step = 0
+    print(f'Initial Time step:\n{time_step}')
+    print(f'Initial policy state:{policy_state}!')
+    episode_return = 0.0
+    
+    while not time_step.is_last():
+      action_step = policy.action(time_step,policy_state)
+      time_step = tf_env.step(action_step.action)
+      print(f'Step:{step}:Reward:{time_step.reward},Observation:{time_step.observation}')
+      #print(f'{step}:Policy state:{action_step.state}')
+      
+      episode_return += time_step.reward
+      step = step + 1
+      
+    print(f'Total return at episode {episode+1}:{episode_return}')
+    returns.append(episode_return.numpy())
+    
+    recovery = {key:value for key, value in tf_env._env._envs[0]._gym_env.env.sx_design.recovery.items() if key.startswith("Strip")}
+    purity = {key:value for key, value in tf_env._env._envs[0]._gym_env.env.sx_design.purity.items() if key.startswith("Strip")}
+
+    print(f'Recovery at episode {episode+1}:{recovery}')
+    print(f'Purity at episode {episode+1}:{purity}')
+    print(f'Design success at episode {episode+1}:{tf_env._env._envs[0]._gym_env.env.design_success}')
+    print(f'Total return at episode {episode+1}:{episode_return}')
+    
+    recovery_list.append(recovery)
+    purity_list.append(purity)
+    
+  print(f'List of returns after {num_episodes} episodes:{returns}')
+  print(f'Average return:{np.mean(returns):.3f},Standard deviation:{np.std(returns):.3f}')
+  tf_env._env._envs[0]._gym_env.env.show_all_initial_metrics()
+  tf_env._env._envs[0]._gym_env.env.show_all_final_metrics()
+  tf_env._env._envs[0]._gym_env.env.show_initial_metric_statistics()
+  tf_env._env._envs[0]._gym_env.env.show_final_metric_statistics()
+  tf_env._env._envs[0]._gym_env.env.show_initial_design()
+  tf_env._env._envs[0]._gym_env.env.show_final_design()
+  print(f'Solvent extraction state:{tf_env._env._envs[0]._gym_env.env.sx_design.x}')
+  tf_env._env._envs[0]._gym_env.env.save_metrics()
+  tf_env._env._envs[0]._gym_env.env.save_design()
    
 
 def read_config(file_name):

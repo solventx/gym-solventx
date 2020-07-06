@@ -1,6 +1,6 @@
 {
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\configurations\\design_d.json",
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\configurations\\design_b.json",
                   "variable_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\env_design_config.json" },
     
 "environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.99}},
@@ -22,12 +22,12 @@
                      
 "logging_config":{"verbosity":"DEBUG","save_data":true,"save_interval":10},
 "reward_config":{"min":-1.0,"max":1.0,
-                 "metrics":{"recovery":{"weight":0.5,
+                 "metrics":{"recovery":{"weight":1.0,
                                         "min":0.0,
                                         "thresholds":{"0":{"threshold":0.65,"reward":1.0}
                                                      }      
                                        }, 
-                           "purity":{"weight":1.5,
+                           "purity":{"weight":1.0,
                                      "min":0.0,
                                      "thresholds":{"0":{"threshold":0.985,"reward":1.0}
                                                   }

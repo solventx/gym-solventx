@@ -1,6 +1,6 @@
 {
                  
-"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\configurations\\design_b.json",
+"process_config":{"design_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\configurations\\design_c.json",
                   "variable_config":"C:\\Users\\splathottam\\Box Sync\\GitHub\\solventx\\env_design_config.json" },
     
 "environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.99}},

@@ -12,10 +12,12 @@ import os
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from solventx import solventx as sx
 from solventx import utilities as util
-from gym_solventx.envs import env_utilities
+from gym_solventx.envs import env_utilities,templates
 
 def get_policy(policy_location):
     """Load policy"""
@@ -41,10 +43,27 @@ def compare_agent_with_optimization(process_config_file,variable_config_file,env
     comparison_df = pd.concat([agent_results_df,optimization_results_df], axis=1, sort=False)
     comparison_df.to_csv('comparison_df.csv')
     
-    filtered_comparison_df = comparison_df.loc[comparison_df['agent-purity-Strip-1'] >= 0.985]
+    for strip_stage in templates.strip_stages:
+        if templates.agent_purity+strip_stage in comparison_df.columns:
+            print(f'{templates.agent_purity+strip_stage} was found in dataframe....')
+            print('Filtering....')
+            filtered_comparison_df = comparison_df.loc[comparison_df[templates.agent_purity+strip_stage] >= 0.985]
+            filtered_comparison_df = filtered_comparison_df.loc[filtered_comparison_df[templates.optim_purity+strip_stage] >= 0.985]
+            print('Plotting box plots....')
+            make_boxplot(comparison_df,[templates.agent_purity+strip_stage,templates.optim_purity+strip_stage])
+            make_boxplot(comparison_df,[templates.agent_recovery+strip_stage,templates.optim_recovery+strip_stage])
+            print('Plotting filtered box plots....')
+            make_boxplot(filtered_comparison_df,[templates.agent_purity+strip_stage,templates.optim_purity+strip_stage])
+            make_boxplot(filtered_comparison_df,[templates.agent_recovery+strip_stage,templates.optim_recovery+strip_stage])
+               
+            print('Plotting distribution...')   
+            make_distributionplot(comparison_df,[templates.agent_purity+strip_stage,templates.optim_purity+strip_stage])
+            make_distributionplot(comparison_df,[templates.agent_recovery+strip_stage,templates.optim_recovery+strip_stage])
+           
     #filtered_comparison_df.drop(columns=['Nd.1','Pr.1'], inplace=True)
-    filtered_comparison_df.to_csv('filtered_comparison_df.csv')    
-
+    filtered_comparison_df.to_csv('filtered_comparison_df.csv')   
+    
+   
 def agent_evaulation_loop_with_cases(env_name,env_config_file,policy_file,cases):
     """Test tf-agent policy"""    
   
@@ -91,8 +110,9 @@ def agent_evaulation_loop_with_cases(env_name,env_config_file,policy_file,cases)
     print(f'Solvent extraction state:{tf_env._env._envs[0]._gym_env.env.sx_design.x}')
     tf_env._env._envs[0]._gym_env.env.save_metrics()
     tf_env._env._envs[0]._gym_env.env.save_design()
+    elements = tf_env._env._envs[0]._gym_env.env.elements
     
-    results_df = pd.concat([tf_env._env._envs[0]._gym_env.env.final_design_df[["Nd","Pr"]],tf_env._env._envs[0]._gym_env.env.final_recovery_df,tf_env._env._envs[0]._gym_env.env.final_purity_df], axis=1, sort=False) 
+    results_df = pd.concat([tf_env._env._envs[0]._gym_env.env.final_design_df[elements],tf_env._env._envs[0]._gym_env.env.final_recovery_df,tf_env._env._envs[0]._gym_env.env.final_purity_df], axis=1, sort=False) 
 
     return results_df   
 
@@ -125,7 +145,7 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
     confEnvDict = util.get_env_config_dict(config_env_file)
     
     logging_interval = 5
-    iters = 100
+    iters = 500
     
     results_df = pd.DataFrame()
     
@@ -150,10 +170,10 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
         
         for key,item in resjsn["recovery"].items():
             if 'Strip' in key:
-                recovery_dict.update({'recovery-'+key:item[0]}) 
+                recovery_dict.update({templates.optim_recovery+key:item[0]}) 
         for key,item in resjsn["purity"].items():
             if 'Strip' in key:
-                purity_dict.update({'purity-'+key:item}) 
+                purity_dict.update({templates.optim_purity+key:item}) 
 
         results_df = results_df.append({**case,**recovery_dict,**purity_dict}, ignore_index=True,sort=True) 
     
@@ -168,3 +188,28 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
     
     return results_df
         
+def make_boxplot(results_df,quantities):
+    """Test agent""" 
+    
+    boxplot = results_df.boxplot(column=quantities)
+    plt.show()
+    
+def make_distributionplot(results_df,quantities):
+    """Test agent""" 
+    
+    targets = [results_df[quantity] for quantity in quantities]
+    
+    for target in targets:
+        
+        if 'recovery' in target.name:
+            quantity = 'recovery'
+        if 'purity' in target.name:
+            quantity = 'purity'
+        if 'agent' in target.name:
+            agent_type = 'agent'
+        if 'optim' in target.name:
+            agent_type = 'optim'
+           
+        sns.distplot(target,hist=True, rug=True,axlabel=quantity,label=agent_type)
+    plt.legend()
+    plt.show()    

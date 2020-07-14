@@ -11,7 +11,7 @@ from gym import error, spaces, utils, logger
 import matplotlib.pyplot as plt
 import solventx
 from solventx import solventx,utilities
-from gym_solventx.envs import env_utilities
+from gym_solventx.envs import env_utilities,templates
 
 class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
     """SolventX environment."""
@@ -117,6 +117,11 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
             self.action_space = spaces.Box(low=lower_bound,high=upper_bound, dtype=np.float32)   
                                     
             #Box(low=np.array([-1.0, -2.0]), high=np.array([2.0, 4.0]), dtype=np.float32)
+        
+        self.elements = []
+        for element in templates.valid_elements:
+            if element in self.observation_dict:
+                self.elements.append(element)
         
         self.initial_purity_df = pd.DataFrame() #Collects over episode
         self.initial_recovery_df = pd.DataFrame() #Collects over episode
@@ -404,12 +409,12 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
                 for group in purity:
                     metric_value = purity[group] #Purity
                     metrics[metric_type].update({group:{'metric_value':metric_value}})              
-                    logger.debug(f'{self.name}:Collected purity {metric_value:.3f} from {group}.')
+                    logger.debug(f'{self.name}:Collected purity {metric_value} from {group}.')
             if metric_type == 'recority':
                 for group in recovery:
-                    metric_value = recovery[group][0] * purity[group] #Recovery*Purity
+                    metric_value = recovery[group][0] * purity[group][0] #Recovery*Purity
                     metrics[metric_type].update({group:{'metric_value':metric_value}})    
-                    logger.debug(f'{self.name}:Converted recovery {recovery[group][0]:.3f} and purity {purity[group]:.3f} from {group} into recority {metric_value:.3f}!')
+                    logger.debug(f'{self.name}:Converted recovery {recovery[group][0]:.3f} and purity {purity[group][0]:.3f} from {group} into recority {metric_value:.3f}!')
                     
         return metrics #{'recovery':{'Strip-1':{'metric_value':[0.1],'elements':['Nd','Pr']}}}
     

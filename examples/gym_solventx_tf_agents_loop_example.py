@@ -36,7 +36,7 @@ random_policy = random_tf_policy.RandomTFPolicy(tf_env.time_step_spec(),tf_env.a
 
 
 total_return = 0.0
-n_episodes = 10
+n_episodes = 1
 for i in range(n_episodes):
     time_step = tf_env.reset()
     

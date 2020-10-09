@@ -145,9 +145,10 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
     confEnvDict = util.get_env_config_dict(config_env_file)
     
     logging_interval = 5
-    iters = 500
+    iters = 100
     
     results_df = pd.DataFrame()
+    design_df = pd.DataFrame()
     
     t1 = time.time()
 
@@ -159,6 +160,7 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
         sx_design.cases = case
 
         resjsn = util.optimize(sx_design, iters)
+        #print(resjsn)
     
         print(f'\nFeed conc @ case {case_key}:{case}')
         print(f'Recovery @ case {case_key}:{resjsn["recovery"]}')
@@ -176,6 +178,8 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
                 purity_dict.update({templates.optim_purity+key:item}) 
 
         results_df = results_df.append({**case,**recovery_dict,**purity_dict}, ignore_index=True,sort=True) 
+        
+        design_df = design_df.append({**resjsn["design"]},ignore_index=True,sort=True)
     
         if eval(case_key)%logging_interval == 0:
             print(f'Saving dataframe at case:{case_key}...')
@@ -183,6 +187,8 @@ def optimization_evaluation_loop(config_file,config_env_file,cases):
     t2 = time.time()
 
     results_df.to_csv('optim_results.csv')
+    design_df.to_csv('optim_results_design.csv')
+    
     print(f'Total Time:{t2-t1:.2f}')
     print(f'Average time per case:{(t2-t1)/len(cases):.2f}')
     

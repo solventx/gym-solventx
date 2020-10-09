@@ -13,7 +13,7 @@ from gym_solventx.envs import env_utilities,evaluation_utilities
 np.set_printoptions(precision=3)
 
 def main():
-    process_config_file = r"C:\Users\splathottam\Box Sync\GitHub\solventx\configurations\design_d.json"       
+    process_config_file = r"C:\Users\splathottam\Box Sync\GitHub\solventx\configurations\design_f.json"       
     variable_config_file = r"C:\Users\splathottam\Box Sync\GitHub\solventx\env_design_config.json"
 
     env_config_file = r"C:\Users\splathottam\Box Sync\GitHub\gym-solventx\environment_design_config.json"

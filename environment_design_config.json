@@ -1,6 +1,6 @@
 {
                  
-"process_config":{"design_config":"/home/splathottam/GitHub/solventx/configurations/design_c.json",
+"process_config":{"design_config":"/home/splathottam/GitHub/solventx/configurations/design_b.json",
                   "variable_config":"/home/splathottam/GitHub/solventx/env_design_config.json" },
     
 "environment_config":{"random_seed":"","goals":{"recority":{},"recovery":{"success_threshold":0.9},"purity":{"success_threshold":0.99}},

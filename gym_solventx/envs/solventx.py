@@ -545,8 +545,8 @@ class SolventXEnv(gym.Env,env_utilities.SolventXEnvUtilities):
     def show_design_performance(self):
         """Show the purity and recovery of current recovery."""
         
-        purity = self.obj.purity['Strip-0'][self.obj.ree.index('Nd')]
-        recovery = self.obj.recovery['Strip-0'][self.obj.ree.index('Nd')]
+        purity = self.sx_design.purity
+        recovery = self.sx_design.recovery
         print(f'Purity:{purity}')
         print(f'Recovery:{recovery}')
     

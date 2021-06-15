@@ -23,7 +23,9 @@ def get_policy(policy_location):
     """Load policy"""
   
     print(f'Loading policy at {policy_location}')
-    return tf.compat.v2.saved_model.load(policy_location)
+    #return tf.compat.v2.saved_model.load(policy_location)
+    return tf.saved_model.load(policy_location)
+
 
 def compare_agent_with_optimization(process_config_file,variable_config_file,env_config_file,policy_dir,policy_file,n_cases = 10):
     """Compare agent with optimization"""    
@@ -112,7 +114,7 @@ def agent_evaulation_loop_with_cases(env_name,env_config_file,policy_file,cases)
     tf_env._env._envs[0]._gym_env.env.save_design()
     elements = tf_env._env._envs[0]._gym_env.env.elements
     
-    results_df = pd.concat([tf_env._env._envs[0]._gym_env.env.final_design_df[elements],tf_env._env._envs[0]._gym_env.env.final_recovery_df,tf_env._env._envs[0]._gym_env.env.final_purity_df], axis=1, sort=False) 
+    results_df = pd.concat([tf_env._env._envs[0]._gym_env.env.final_design_df,tf_env._env._envs[0]._gym_env.env.final_recovery_df,tf_env._env._envs[0]._gym_env.env.final_purity_df], axis=1, sort=False) 
 
     return results_df   
 
